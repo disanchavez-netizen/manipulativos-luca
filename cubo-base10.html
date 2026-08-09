@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    #canvas { cursor: crosshair; }
+    .block-container {
+      position: absolute; cursor: grab; touch-action: none; transition: filter 0.2s;
+      filter: drop-shadow(2px 4px 8px rgba(0,0,0,0.10));
+    }
+    .block-container:active { cursor: grabbing; }
+    .block-container.selected { filter: drop-shadow(0 0 12px rgba(59, 68, 208, 0.7)) !important; }
+    .svg-holder { width: 100%; height: 100%; }
+    .selection-rectangle {
+      position: absolute; border: 2px solid var(--primary-600);
+      background: var(--primary-50); opacity: 0.6; display: none; z-index: 5; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div class="brand-chip"><span class="word">Luca</span><span class="dot">.</span></div>
+
+<div class="app">
+  <div class="workspace">
+    <div id="canvas"></div>
+    <div class="selection-rectangle" id="selectionRect"></div>
+
+    <div class="total-bar" id="totalBar">
+      <div>
+        <span class="label">Representación simbólica</span>
+        <span class="number" id="totalNumber">0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="assets/comun.js"></script>
+<script>
+  const app = {
+    canvas: null, totalBar: null, totalNumber: null, selectionRect: null,
+
+    snapX: 20, snapY: 10, selectedBlocks: [], isDragging: false, isSelecting: false,
+    startX: 0, startY: 0, offsetX: 0, offsetY: 0, zIndexCounter: 1,
+
+    blockStyles: {
+      'U': { val: 1,    cL: '#9AA3F0', cM: '#3B44D0', cD: '#2E36A8' },
+      'D': { val: 10,   cL: '#FFC9CA', cM: '#FF8283', cD: '#C94F50' },
+      'C': { val: 100,  cL: '#FFDD94', cM: '#FFBA31', cD: '#C88A00' },
+      'M': { val: 1000, cL: '#8FE5DD', cM: '#32C8BD', cD: '#1A9990' }
+    },
+
+    generateSVG(type, rot) {
+      const uX = 20, uY = 10, uZ = 20; let w = 1, d = 1, h = 1;
+      if (type === 'D') {
+        if (rot === 0 || rot === 3) { w = 1; d = 1; h = 10; }
+        else if (rot === 1) { w = 10; d = 1; h = 1; }
+        else if (rot === 2) { w = 1; d = 10; h = 1; }
+      } else if (type === 'C') {
+        if (rot === 0 || rot === 3) { w = 10; d = 10; h = 1; }
+        else if (rot === 1) { w = 10; d = 1; h = 10; }
+        else if (rot === 2) { w = 1; d = 10; h = 10; }
+      } else if (type === 'M') { w = 10; d = 10; h = 10; }
+
+      let colors = { top: this.blockStyles[type].cL, left: this.blockStyles[type].cM, right: this.blockStyles[type].cD };
+      if (type === 'M') {
+        if (rot === 1) colors = { top: this.blockStyles[type].cD, left: this.blockStyles[type].cL, right: this.blockStyles[type].cM };
+        if (rot === 2) colors = { top: this.blockStyles[type].cM, left: this.blockStyles[type].cD, right: this.blockStyles[type].cL };
+      }
+
+      const proj = (x, y, z) => ({ px: (x - y) * uX, py: (x + y) * uY - (z * uZ) });
+      const pts = [proj(0,0,0), proj(w,0,0), proj(0,d,0), proj(w,d,0), proj(0,0,h), proj(w,0,h), proj(0,d,h), proj(w,d,h)];
+      const minX = Math.min(...pts.map(p => p.px)), maxX = Math.max(...pts.map(p => p.px));
+      const minY = Math.min(...pts.map(p => p.py)), maxY = Math.max(...pts.map(p => p.py));
+
+      const padding = 2, width = maxX - minX + padding * 2, height = maxY - minY + padding * 2;
+      const ox = -minX + padding, oy = -minY + padding;
+
+      let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+      svg += `<g transform="translate(${ox}, ${oy})">`;
+
+      const strokeLine = `stroke="rgba(0,0,0,0.15)" stroke-width="0.7"`;
+      const strokeBorder = `stroke="rgba(0,0,0,0.4)" stroke-width="1.2" stroke-linejoin="round"`;
+
+      let pathLeft = `M ${proj(0,d,0).px} ${proj(0,d,0).py} L ${proj(w,d,0).px} ${proj(w,d,0).py} L ${proj(w,d,h).px} ${proj(w,d,h).py} L ${proj(0,d,h).px} ${proj(0,d,h).py} Z`;
+      svg += `<path d="${pathLeft}" fill="${colors.left}" ${strokeBorder}/>`;
+      for (let i = 1; i < w; i++) { let p1 = proj(i,d,0), p2 = proj(i,d,h); svg += `<line x1="${p1.px}" y1="${p1.py}" x2="${p2.px}" y2="${p2.py}" ${strokeLine}/>`; }
+      for (let k = 1; k < h; k++) { let p1 = proj(0,d,k), p2 = proj(w,d,k); svg += `<line x1="${p1.px}" y1="${p1.py}" x2="${p2.px}" y2="${p2.py}" ${strokeLine}/>`; }
+
+      let pathRight = `M ${proj(w,0,0).px} ${proj(w,0,0).py} L ${proj(w,d,0).px} ${proj(w,d,0).py} L ${proj(w,d,h).px} ${proj(w,d,h).py} L ${proj(w,0,h).px} ${proj(w,0,h).py} Z`;
+      svg += `<path d="${pathRight}" fill="${colors.right}" ${strokeBorder}/>`;
+      for (let j = 1; j < d; j++) { let p1 = proj(w,j,0), p2 = proj(w,j,h); svg += `<line x1="${p1.px}" y1="${p1.py}" x2="${p2.px}" y2="${p2.py}" ${strokeLine}/>`; }
+      for (let k = 1; k < h; k++) { let p1 = proj(w,0,k), p2 = proj(w,d,k); svg += `<line x1="${p1.px}" y1="${p1.py}" x2="${p2.px}" y2="${p2.py}" ${strokeLine}/>`; }
+
+      let pathTop = `M ${proj(0,0,h).px} ${proj(0,0,h).py} L ${proj(w,0,h).px} ${proj(w,0,h).py} L ${proj(w,d,h).px} ${proj(w,d,h).py} L ${proj(0,d,h).px} ${proj(0,d,h).py} Z`;
+      svg += `<path d="${pathTop}" fill="${colors.top}" ${strokeBorder}/>`;
+      for (let i = 1; i < w; i++) { let p1 = proj(i,0,h), p2 = proj(i,d,h); svg += `<line x1="${p1.px}" y1="${p1.py}" x2="${p2.px}" y2="${p2.py}" ${strokeLine}/>`; }
+      for (let j = 1; j < d; j++) { let p1 = proj(0,j,h), p2 = proj(w,j,h); svg += `<line x1="${p1.px}" y1="${p1.py}" x2="${p2.px}" y2="${p2.py}" ${strokeLine}/>`; }
+
+      svg += `</g></svg>`; return svg;
+    },
+
+    addBlock(type) {
+      const container = document.createElement('div'); container.className = 'block-container';
+      container.dataset.type = type; container.dataset.rot = 0; container.dataset.val = this.blockStyles[type].val;
+
+      const menu = Luca.ctxRadial([
+        { action: 'rotate',  icon: 'rotate-cw',        tip: 'Rotar' },
+        { action: 'forward', icon: 'arrow-up-to-line', tip: 'Traer al frente' },
+        { action: 'delete',  icon: 'x',                tip: 'Eliminar', danger: true }
+      ]);
+      menu.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn || btn.dataset.lp) return;
+        const action = btn.dataset.action;
+        if (action === 'rotate') this.rotateSelectedBlocks();
+        else if (action === 'forward') this.bringSelectedToFront();
+        else if (action === 'delete') this.deleteSelectedBlocks();
+      });
+
+      const svgHolder = document.createElement('div'); svgHolder.className = 'svg-holder';
+      svgHolder.innerHTML = this.generateSVG(type, 0);
+
+      container.appendChild(menu); container.appendChild(svgHolder);
+
+      const rOffset = Math.floor(Math.random() * 5) * this.snapX;
+      container.style.left = (this.canvas.offsetWidth / 2 - 50 + rOffset) + 'px';
+      container.style.top = (this.canvas.offsetHeight / 2 - 50 + rOffset) + 'px';
+      container.style.zIndex = this.zIndexCounter++;
+
+      container.addEventListener('pointerdown', (e) => this.selectBlock(e, container));
+      this.canvas.appendChild(container);
+      Luca.icons();
+      this.updateTotal();
+    },
+
+    selectBlock(e, container) {
+      if (!e.target.closest('.ctx-radial')) {
+        Luca.text.deselect();
+        this.selectedBlocks.forEach(b => b.classList.remove('selected'));
+        this.selectedBlocks = [container]; container.classList.add('selected');
+        this.isDragging = true;
+        this.offsetX = e.clientX - container.offsetLeft;
+        this.offsetY = e.clientY - container.offsetTop;
+        Luca.fab.refreshCard();
+      }
+    },
+
+    rotateSelectedBlocks() {
+      this.selectedBlocks.forEach(container => {
+        const type = container.dataset.type; if (type === 'U') return;
+        let rot = (parseInt(container.dataset.rot) || 0); rot = (rot + 1) % 4; container.dataset.rot = rot;
+        container.querySelector('.svg-holder').innerHTML = this.generateSVG(type, rot);
+      });
+    },
+
+    bringSelectedToFront() {
+      const maxZ = Math.max(...Array.from(this.canvas.querySelectorAll('.block-container')).map(el => parseInt(el.style.zIndex) || 0));
+      this.selectedBlocks.forEach(container => container.style.zIndex = maxZ + 1);
+    },
+
+    deleteSelectedBlocks() {
+      this.selectedBlocks.forEach(container => container.remove());
+      this.selectedBlocks = []; this.updateTotal(); Luca.fab.refreshCard();
+    },
+
+    toggleTotal() { this.totalBar.classList.toggle('hidden'); },
+    clearCanvas() { this.canvas.innerHTML = ''; this.selectedBlocks = []; Luca.text.clear(); this.updateTotal(); Luca.fab.refreshCard(); },
+
+    updateTotal() {
+      let t = 0;
+      this.canvas.querySelectorAll('.block-container').forEach(b => t += parseInt(b.dataset.val));
+      this.totalNumber.textContent = t;
+    },
+
+    isBlockInRect(block, rectLeft, rectTop, rectRight, rectBottom) {
+      const bL = block.offsetLeft, bT = block.offsetTop, bR = bL + block.offsetWidth, bB = bT + block.offsetHeight;
+      return !(bR < rectLeft || bL > rectRight || bB < rectTop || bT > rectBottom);
+    },
+
+    init() {
+      this.canvas = document.getElementById('canvas');
+      this.totalBar = document.getElementById('totalBar');
+      this.totalNumber = document.getElementById('totalNumber');
+      this.selectionRect = document.getElementById('selectionRect');
+
+      Luca.text.init(this.canvas, {
+        onSelectionChange: () => { this.selectedBlocks.forEach(b => b.classList.remove('selected')); this.selectedBlocks = []; }
+      });
+      const PART = [
+        ['U', 'square',             'ic-indigo',   'Unidad',  '1'],
+        ['D', 'rectangle-vertical', 'ic-rosa',     'Decena',  '10'],
+        ['C', 'grid-3x3',           'ic-amarillo', 'Centena', '100'],
+        ['M', 'box',                'ic-verde',    'Millar',  '1000'],
+      ];
+      Luca.fab.init({
+        vista: () => this.toggleTotal(),
+        vistaTip: 'Ver / ocultar total',
+        capture: () => Luca.capturar(this.canvas, 'cubo-base10-luca'),
+        reset: () => this.clearCanvas(),
+        resetTip: 'Reiniciar lienzo',
+        isPiece: (t) => !!t.closest('.block-container'),
+        buildPart: (el) => PART.forEach(([type, ic, cls, label, val]) => {
+          const b = document.createElement('button');
+          b.className = 'tc-item';
+          b.innerHTML = `<span class="chip-ic ${cls}"><i data-lucide="${ic}"></i></span>${label}<span class="tc-val">${val}</span>`;
+          b.addEventListener('click', () => this.addBlock(type));
+          el.appendChild(b);
+        }),
+        /* Contextual: aplica a TODA la selección múltiple */
+        getCtx: () => this.selectedBlocks.length ? {
+          title: this.selectedBlocks.length > 1 ? this.selectedBlocks.length + ' piezas seleccionadas' : 'Pieza seleccionada',
+          items: [
+            { icon: 'rotate-cw',        tip: 'Rotar',           action: 'rotate' },
+            { icon: 'arrow-up-to-line', tip: 'Traer al frente', action: 'forward' },
+            { icon: 'x',                tip: 'Eliminar',        action: 'delete', danger: true },
+          ],
+          run: (a) => {
+            if (a === 'rotate') this.rotateSelectedBlocks();
+            else if (a === 'forward') this.bringSelectedToFront();
+            else if (a === 'delete') this.deleteSelectedBlocks();
+          }
+        } : null
+      });
+
+      this.canvas.addEventListener('pointerdown', (e) => {
+        if (e.target === this.canvas) {
+          const cr = this.canvas.getBoundingClientRect();
+          this.isSelecting = true;
+          this.startX = e.clientX - cr.left; this.startY = e.clientY - cr.top;
+          this.selectedBlocks.forEach(b => b.classList.remove('selected')); this.selectedBlocks = [];
+        }
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (this.isDragging && this.selectedBlocks.length > 0) {
+          const firstBlock = this.selectedBlocks[0];
+          const snappedX = Math.round((e.clientX - this.offsetX) / this.snapX) * this.snapX;
+          const snappedY = Math.round((e.clientY - this.offsetY) / this.snapY) * this.snapY;
+          const deltaX = snappedX - firstBlock.offsetLeft, deltaY = snappedY - firstBlock.offsetTop;
+          this.selectedBlocks.forEach(block => {
+            block.style.left = (block.offsetLeft + deltaX) + 'px';
+            block.style.top = (block.offsetTop + deltaY) + 'px';
+          });
+        }
+        if (this.isSelecting) {
+          const cr = this.canvas.getBoundingClientRect();
+          const curX = e.clientX - cr.left, curY = e.clientY - cr.top;
+          const left = Math.min(this.startX, curX), top = Math.min(this.startY, curY);
+          const width = Math.abs(curX - this.startX), height = Math.abs(curY - this.startY);
+          Object.assign(this.selectionRect.style, { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px', display: 'block' });
+
+          this.canvas.querySelectorAll('.block-container').forEach(block => {
+            if (this.isBlockInRect(block, left, top, left + width, top + height)) {
+              block.classList.add('selected');
+              if (!this.selectedBlocks.includes(block)) this.selectedBlocks.push(block);
+            } else {
+              block.classList.remove('selected');
+              this.selectedBlocks = this.selectedBlocks.filter(b => b !== block);
+            }
+          });
+        }
+      });
+
+      window.addEventListener('pointerup', () => {
+        if (this.isSelecting) {
+          this._suppressClick = this.selectedBlocks.length > 0;   /* el click posterior no debe deseleccionar */
+          Luca.fab.refreshCard();
+        }
+        this.isDragging = false; this.isSelecting = false; this.selectionRect.style.display = 'none';
+      });
+
+      this.canvas.addEventListener('click', (e) => {
+        if (this._suppressClick) { this._suppressClick = false; return; }
+        if (e.target === this.canvas) {
+          this.selectedBlocks.forEach(b => b.classList.remove('selected'));
+          this.selectedBlocks = [];
+          Luca.fab.refreshCard();
+        }
+      });
+    }
+  };
+
+  window.addEventListener('DOMContentLoaded', () => app.init());
+</script>
+  <script>
+    /* User Guide (coach marks) — se abre desde el nodo «?» del radial */
+    window.addEventListener('DOMContentLoaded', function () {
+      Luca.guide.init('cubo-base10', [
+        { el: '#canvas', title: 'El lienzo', text: 'Toca los bloques para seleccionarlos y arrástralos con libertad. Suelta una pieza sobre otra para agruparlas.' },
+        { el: '#totalBar', title: 'Total', text: 'El valor de todos los bloques del lienzo. Puedes ocultarlo desde «Vista».', optional: true },
+        { el: '.fab2 [data-id=\'tool\']', title: 'Agregar bloques', text: 'Abre «⋯ Acciones» y toca Unidad, Decena o Centena para agregar bloques al lienzo.', before: () => Luca.fab.setOpen(true) },
+      ].concat(Luca.guide.commonSteps()));
+    });
+  </script>
+</body>
+</html>

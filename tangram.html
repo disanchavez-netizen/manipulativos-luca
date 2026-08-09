@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    .piece-container {
+      position: absolute; cursor: grab; touch-action: none; transition: filter 0.2s;
+      filter: drop-shadow(2px 4px 8px rgba(0,0,0,0.10));
+    }
+    .piece-container:active { cursor: grabbing; }
+    .piece-container.selected { filter: drop-shadow(0 0 12px rgba(59, 68, 208, 0.7)) !important; }
+    .svg-piece { width: 100%; height: 100%; display: block; }
+    /* La rotación de la pieza se compensa en el menú para mantenerlo legible */
+    .piece-container .ctx-radial { transition: transform 0.25s ease; }
+  </style>
+</head>
+<body>
+<div class="brand-chip"><span class="word">Luca</span><span class="dot">.</span></div>
+
+<div class="app">
+  <div class="workspace">
+    <div id="canvas"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="assets/comun.js"></script>
+<script>
+  const app = {
+    canvas: null,
+    selectedPieces: [], isDragging: false,
+    dragStartX: 0, dragStartY: 0, offsetX: 0, offsetY: 0, zIndexCounter: 1,
+
+    pieceColors: {
+      triangleGrand:  '#3B44D0',
+      triangleSmall:  '#FF8283',
+      triangleMedium: '#FFBA31',
+      square:         '#32C8BD',
+      parallelogram:  '#512DA8'
+    },
+
+    generateSVG(type, flipped = false) {
+      const L = 140, sqrt2 = Math.sqrt(2), scaleX = flipped ? -1 : 1;
+      const fill = this.pieceColors[type];
+      const stroke = 'stroke="rgba(0,0,0,0.15)" stroke-width="1.5"';
+
+      if (type === 'triangleSmall' || type === 'triangleMedium' || type === 'triangleGrand') {
+        const cateto = type === 'triangleSmall' ? Math.round(L * sqrt2 / 4)
+                     : type === 'triangleMedium' ? L / 2
+                     : Math.round(L * sqrt2 / 2);
+        const points = `0,${cateto} ${cateto},${cateto} 0,0`;
+        return `<svg width="${cateto}" height="${cateto}" viewBox="0 0 ${cateto} ${cateto}" xmlns="http://www.w3.org/2000/svg"><g transform="scale(${scaleX}, 1) translate(${flipped ? -cateto : 0}, 0)"><polygon points="${points}" fill="${fill}" ${stroke}/></g></svg>`;
+      }
+      if (type === 'square') {
+        const lado = Math.round(L * sqrt2 / 4);
+        return `<svg width="${lado}" height="${lado}" viewBox="0 0 ${lado} ${lado}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${lado}" height="${lado}" fill="${fill}" ${stroke}/></svg>`;
+      }
+      if (type === 'parallelogram') {
+        const ladoLargo = L / 2, ladoCorto = Math.round(L * sqrt2 / 4), altura = ladoCorto, desplazamiento = ladoCorto;
+        const points = flipped
+          ? `${desplazamiento},0 ${desplazamiento + ladoLargo},0 ${ladoLargo},${altura} 0,${altura}`
+          : `0,0 ${ladoLargo},0 ${desplazamiento + ladoLargo},${altura} ${desplazamiento},${altura}`;
+        const width = desplazamiento + ladoLargo + 5, viewWidth = desplazamiento + ladoLargo + 10;
+        return `<svg width="${width}" height="${altura + 10}" viewBox="0 0 ${viewWidth} ${altura + 10}" xmlns="http://www.w3.org/2000/svg"><polygon points="${points}" fill="${fill}" ${stroke}/></svg>`;
+      }
+      return '';
+    },
+
+    addPiece(type) {
+      const container = document.createElement('div'); container.className = 'piece-container';
+      container.dataset.type = type; container.dataset.rotation = 0; container.dataset.flipped = 'false';
+
+      const menu = Luca.ctxRadial([
+        { action: 'rotate',  icon: 'rotate-cw',         tip: 'Rotar 45°' },
+        { action: 'flip',    icon: 'flip-horizontal-2', tip: 'Voltear' },
+        { action: 'forward', icon: 'arrow-up-to-line',  tip: 'Traer al frente' },
+        { action: 'delete',  icon: 'x',                 tip: 'Eliminar', danger: true }
+      ]);
+      menu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const btn = e.target.closest('[data-action]');
+        if (!btn || btn.dataset.lp) return;
+        const action = btn.dataset.action;
+        if (action === 'rotate') this.rotateSelectedPieces();
+        else if (action === 'flip') this.flipSelectedPieces();
+        else if (action === 'forward') this.bringSelectedToFront();
+        else if (action === 'delete') this.deleteSelectedPieces();
+      });
+
+      const svgHolder = document.createElement('div'); svgHolder.className = 'svg-piece';
+      svgHolder.innerHTML = this.generateSVG(type, false);
+
+      container.appendChild(menu); container.appendChild(svgHolder);
+      const rOffset = Math.floor(Math.random() * 5) * 15;
+      container.style.left = (this.canvas.offsetWidth / 2 - 50 + rOffset) + 'px';
+      container.style.top = (this.canvas.offsetHeight / 2 - 50 + rOffset) + 'px';
+      container.style.zIndex = this.zIndexCounter++;
+      container.addEventListener('pointerdown', (e) => this.selectPiece(e, container));
+      this.canvas.appendChild(container);
+      Luca.icons();
+    },
+
+    /* Rotación por pasos de 45° desde el menú contextual (sustituye al handle) */
+    rotateSelectedPieces() {
+      this.selectedPieces.forEach(container => {
+        const rot = ((parseInt(container.dataset.rotation) || 0) + 45) % 360;
+        container.dataset.rotation = rot;
+        container.style.transform = `rotate(${rot}deg)`;
+        this._counterRotateMenu(container);
+      });
+    },
+
+    _counterRotateMenu(container) {
+      const menu = container.querySelector('.ctx-radial');
+      if (menu) menu.style.transform = `rotate(-${parseInt(container.dataset.rotation) || 0}deg)`;
+    },
+
+    bringSelectedToFront() {
+      const maxZ = Math.max(...Array.from(this.canvas.querySelectorAll('.piece-container')).map(el => parseInt(el.style.zIndex) || 0));
+      this.selectedPieces.forEach(container => container.style.zIndex = maxZ + 1);
+    },
+
+    flipSelectedPieces() {
+      this.selectedPieces.forEach(container => {
+        container.dataset.flipped = container.dataset.flipped === 'true' ? 'false' : 'true';
+        container.querySelector('.svg-piece').innerHTML = this.generateSVG(container.dataset.type, container.dataset.flipped === 'true');
+      });
+    },
+
+    deleteSelectedPieces() { this.selectedPieces.forEach(c => c.remove()); this.selectedPieces = []; Luca.fab.refreshCard(); },
+
+    selectPiece(e, container) {
+      if (!e.target.closest('.ctx-radial')) {
+        Luca.text.deselect();
+        this.selectedPieces.forEach(p => p.classList.remove('selected'));
+        this.selectedPieces = [container]; container.classList.add('selected');
+        this._counterRotateMenu(container);
+        this.isDragging = true;
+        this.offsetX = e.clientX - container.offsetLeft; this.offsetY = e.clientY - container.offsetTop;
+        this.dragStartX = container.offsetLeft; this.dragStartY = container.offsetTop;
+        Luca.fab.refreshCard();
+      }
+    },
+
+    getVertices(piece) {
+      const type = piece.dataset.type, rect = piece.getBoundingClientRect(), unit = 70, sqrt2 = Math.sqrt(2);
+      let vertices = [];
+      if (type === 'triangleSmall') vertices = [[0, unit], [unit, unit], [0, 0]];
+      else if (type === 'triangleMedium') { const c = Math.round(unit * sqrt2); vertices = [[0, c], [c, c], [0, 0]]; }
+      else if (type === 'triangleGrand') vertices = [[0, 2 * unit], [2 * unit, 2 * unit], [0, 0]];
+      else if (type === 'square') vertices = [[0, 0], [unit, 0], [unit, unit], [0, unit]];
+      else if (type === 'parallelogram') {
+        const b = Math.round(unit * sqrt2), off = Math.round(unit / sqrt2);
+        vertices = [[0, 0], [b, 0], [b + off, unit], [off, unit]];
+      }
+      return { rect, vertices };
+    },
+
+    checkMagneticSnap(piece) {
+      const snapDistance = 15;
+      const myData = this.getVertices(piece);
+      const pieces = this.canvas.querySelectorAll('.piece-container');
+      let bestDX = 0, bestDY = 0, bestDist = snapDistance;
+      pieces.forEach(other => {
+        if (other === piece) return;
+        const otherData = this.getVertices(other);
+        myData.vertices.forEach(myV => {
+          otherData.vertices.forEach(otherV => {
+            const dx = (otherData.rect.left + otherV[0]) - (myData.rect.left + myV[0]);
+            const dy = (otherData.rect.top + otherV[1]) - (myData.rect.top + myV[1]);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < bestDist) { bestDist = dist; bestDX = dx; bestDY = dy; }
+          });
+        });
+      });
+      if (bestDist < snapDistance) {
+        piece.style.left = (parseInt(piece.style.left) + bestDX) + 'px';
+        piece.style.top = (parseInt(piece.style.top) + bestDY) + 'px';
+      }
+    },
+
+    clearCanvas() { this.canvas.innerHTML = ''; this.selectedPieces = []; Luca.text.clear(); Luca.fab.refreshCard(); },
+
+    init() {
+      this.canvas = document.getElementById('canvas');
+
+      Luca.text.init(this.canvas, {
+        onSelectionChange: () => { this.selectedPieces.forEach(p => p.classList.remove('selected')); this.selectedPieces = []; }
+      });
+      const PART = [
+        ['triangleGrand',  'triangle', 'ic-indigo',   'Triángulo grande'],
+        ['triangleMedium', 'triangle', 'ic-amarillo', 'Triángulo mediano'],
+        ['triangleSmall',  'triangle', 'ic-rosa',     'Triángulo pequeño'],
+        ['square',         'square',   'ic-verde',    'Cuadrado'],
+        ['parallelogram',  'diamond',  'ic-morado',   'Paralelogramo'],
+      ];
+      Luca.fab.init({
+        capture: () => Luca.capturar(this.canvas, 'tangram-luca'),
+        reset: () => this.clearCanvas(),
+        resetTip: 'Reiniciar lienzo',
+        isPiece: (t) => !!t.closest('.piece-container'),
+        buildPart: (el) => PART.forEach(([type, ic, cls, label]) => {
+          const b = document.createElement('button');
+          b.className = 'tc-item';
+          b.innerHTML = `<span class="chip-ic ${cls}"><i data-lucide="${ic}"></i></span>${label}`;
+          b.addEventListener('click', () => this.addPiece(type));
+          el.appendChild(b);
+        }),
+        getCtx: () => this.selectedPieces.length ? {
+          title: 'Pieza seleccionada',
+          items: [
+            { icon: 'rotate-cw',         tip: 'Rotar 45°',       action: 'rotate' },
+            { icon: 'flip-horizontal-2', tip: 'Voltear',         action: 'flip' },
+            { icon: 'arrow-up-to-line',  tip: 'Traer al frente', action: 'forward' },
+            { icon: 'x',                 tip: 'Eliminar',        action: 'delete', danger: true },
+          ],
+          run: (a) => {
+            if (a === 'rotate') this.rotateSelectedPieces();
+            else if (a === 'flip') this.flipSelectedPieces();
+            else if (a === 'forward') this.bringSelectedToFront();
+            else if (a === 'delete') this.deleteSelectedPieces();
+          }
+        } : null
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (this.isDragging && this.selectedPieces.length > 0) {
+          const newX = e.clientX - this.offsetX, newY = e.clientY - this.offsetY;
+          this.selectedPieces.forEach(p => {
+            p.style.left = (parseInt(p.style.left) + (newX - this.dragStartX)) + 'px';
+            p.style.top = (parseInt(p.style.top) + (newY - this.dragStartY)) + 'px';
+          });
+          this.dragStartX = newX; this.dragStartY = newY;
+        }
+      });
+
+      window.addEventListener('pointerup', () => {
+        if (this.isDragging && this.selectedPieces.length > 0) this.selectedPieces.forEach(p => this.checkMagneticSnap(p));
+        this.isDragging = false;
+      });
+
+      this.canvas.addEventListener('click', (e) => {
+        if (e.target === this.canvas) {
+          this.selectedPieces.forEach(p => p.classList.remove('selected'));
+          this.selectedPieces = [];
+          Luca.fab.refreshCard();
+        }
+      });
+    }
+  };
+
+  window.addEventListener('DOMContentLoaded', () => app.init());
+</script>
+  <script>
+    /* User Guide (coach marks) — se abre desde el nodo «?» del radial */
+    window.addEventListener('DOMContentLoaded', function () {
+      Luca.guide.init('tangram', [
+        { el: '#canvas', title: 'El lienzo', text: 'Arrastra las piezas para moverlas. Con una pieza seleccionada aparece su menú para rotarla, voltearla o eliminarla.' },
+        { el: '.fab2 [data-id=\'tool\']', title: 'Agregar piezas', text: 'Desde «⋯ Acciones» agrega las 7 piezas del tangram: triángulos, cuadrado y romboide.', before: () => Luca.fab.setOpen(true) },
+      ].concat(Luca.guide.commonSteps()));
+    });
+  </script>
+</body>
+</html>

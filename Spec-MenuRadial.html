@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Especificación — Menú Flotante Radial · Luca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary-600:#3B44D0; --primary-700:#2E36A8; --primary-50:#EEF0FC; --primary-100:#DCDFF8;
+  --rosa:#FF8283; --rosa-50:#FFF1F1; --rosa-700:#C94F50;
+  --amarillo:#FFBA31; --amarillo-50:#FFF6E3; --amarillo-700:#B07900;
+  --verde:#32C8BD; --verde-50:#E7FAF8; --verde-700:#1A9990;
+  --morado:#512DA8; --morado-50:#F1ECFA;
+  --success-600:#16A34A; --success-50:#F0FDF4;
+  --danger-600:#DC2626; --danger-50:#FEF2F2;
+  --bg:#F7F8FA; --surface:#FFFFFF;
+  --gray-50:#F9FAFB; --gray-100:#F3F4F6; --gray-200:#E5E7EB; --gray-400:#9CA3AF;
+  --gray-500:#6B7280; --gray-600:#4B5563; --gray-700:#374151; --gray-900:#111827;
+  --radius:12px; --radius-sm:8px;
+  --shadow-card:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-float:0 6px 20px rgba(17,24,39,.12),0 2px 6px rgba(17,24,39,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Poppins',sans-serif}
+body{background:var(--bg);color:var(--gray-700)}
+.page{max-width:1180px;margin:0 auto;padding:40px 28px 80px}
+
+.doc-header{margin-bottom:28px}
+.doc-header .eyebrow{font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--primary-600);margin-bottom:6px}
+.doc-header h1{font-size:26px;font-weight:600;color:var(--gray-900)}
+.doc-header p{font-size:14px;color:var(--gray-500);margin-top:4px}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:4px 12px;border-radius:999px;background:var(--amarillo-50);color:var(--amarillo-700);margin-top:10px}
+
+.section{margin-top:36px}
+.section > h2{font-size:15px;font-weight:600;color:var(--gray-900);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.section > h2 .num{width:24px;height:24px;border-radius:50%;background:var(--primary-600);color:#fff;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.section > .sub{font-size:13px;color:var(--gray-500);margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--gray-100);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px}
+
+/* ================= DEMO VIVO ================= */
+.demo-tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.demo-tab{padding:8px 18px;border-radius:999px;border:1px solid var(--gray-200);background:#fff;font-size:13px;font-weight:600;color:var(--gray-500);cursor:pointer}
+.demo-tab.active{background:var(--primary-600);border-color:var(--primary-600);color:#fff}
+.demo-hint{font-size:12px;color:var(--gray-500);margin-bottom:10px}
+.demo-stage{position:relative;height:560px;border-radius:var(--radius);border:1px solid var(--gray-200);background:
+  linear-gradient(rgba(59,68,208,.03) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(59,68,208,.03) 1px,transparent 1px),var(--bg);
+  background-size:24px 24px;overflow:hidden}
+.brand-chip{position:absolute;top:14px;left:14px;background:rgba(255,255,255,.30);border:1px solid rgba(59,68,208,.15);border-radius:999px;padding:5px 14px;box-shadow:none;z-index:50;pointer-events:none}
+.brand-chip .word{font-size:16px;font-weight:700;color:rgba(59,68,208,.45)}
+.brand-chip .dot{font-size:16px;font-weight:700;color:rgba(255,130,131,.55)}
+.stage-total{position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,.95);border-top:1px solid var(--gray-200);padding:8px;text-align:center;z-index:5}
+.stage-total .label{font-size:10px;color:var(--gray-500);font-weight:500}
+.stage-total .number{font-size:24px;font-weight:600;color:var(--primary-600);line-height:1}
+
+/* ---- Pieza demo ---- */
+.demo-piece{position:absolute;cursor:grab;touch-action:none;user-select:none;z-index:20}
+.demo-piece:active{cursor:grabbing}
+.demo-piece.selected .shape{outline:3px dashed rgba(59,68,208,.65);outline-offset:3px}
+.demo-piece .shape{filter:drop-shadow(2px 4px 8px rgba(0,0,0,.10))}
+
+/* ---- Texto libre ---- */
+.free-text{position:absolute;cursor:grab;touch-action:none;z-index:25;color:#000;font-weight:600;line-height:1.2;padding:4px 8px;border-radius:6px;min-width:24px;white-space:pre-wrap}
+.free-text:active{cursor:grabbing}
+.free-text.editing{outline:2px solid var(--primary-600);background:rgba(255,255,255,.85);cursor:text}
+.free-text.selected:not(.editing){outline:2px dashed rgba(59,68,208,.65)}
+.free-text.size-S{font-size:16px}.free-text.size-M{font-size:26px}.free-text.size-L{font-size:40px}
+
+/* ---- Contextual radial (pieza/texto) ---- */
+.ctx-radial{position:absolute;left:50%;top:-6px;width:0;height:0;display:none;z-index:900}
+.selected>.ctx-radial{display:block}
+.ctx-node{position:absolute;width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid var(--gray-200);
+  box-shadow:var(--shadow-float);color:var(--gray-600);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transform:translate(-50%,-50%) translate(var(--tx),var(--ty));animation:ctxPop .3s cubic-bezier(.34,1.56,.64,1) backwards;animation-delay:calc(var(--i)*35ms);font-size:11px;font-weight:700}
+.ctx-node .lucide{width:17px;height:17px;pointer-events:none}
+.ctx-node:hover{background:var(--primary-50);color:var(--primary-600)}
+.ctx-node.is-danger{color:var(--danger-600)}.ctx-node.is-danger:hover{background:var(--danger-50)}
+@keyframes ctxPop{from{transform:translate(-50%,-50%) scale(.3);opacity:0}to{transform:translate(-50%,-50%) translate(var(--tx),var(--ty)) scale(1);opacity:1}}
+.ctx-node::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:var(--gray-900);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;white-space:nowrap;opacity:0;transition:opacity .15s;pointer-events:none}
+.ctx-node:hover::after{opacity:1}
+
+/* ================= MENÚ RADIAL v2 ================= */
+.fab2{position:absolute;right:168px;bottom:178px;width:0;height:0;z-index:1000}
+/* Disco de fondo: plano semitransparente */
+.fab2 .disc{position:absolute;left:50%;top:50%;width:300px;height:300px;border-radius:50%;transform:translate(-50%,-50%) scale(.35);
+  background:rgba(255,255,255,.55);border:1.5px solid rgba(59,68,208,.18);box-shadow:var(--shadow-float);
+  opacity:0;pointer-events:none;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .3s}
+.fab2.open .disc{opacity:1;transform:translate(-50%,-50%) scale(1)}
+/* Botón central */
+.fab2 .core{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;
+  background:var(--primary-600);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--shadow-float);z-index:3;transition:background .25s,transform .35s cubic-bezier(.34,1.56,.64,1)}
+.fab2 .core:hover{background:var(--primary-700)}
+.fab2 .core .core-l{font-size:26px;font-weight:700;color:#fff;line-height:1;letter-spacing:-1px}
+.fab2 .core .core-dot{color:var(--rosa)}
+.fab2.open .core{transform:translate(-50%,-50%) scale(1.06)}
+/* Nodos: círculo completo, posiciones horarias fijas */
+.fab2 .node{position:absolute;left:50%;top:50%;width:48px;height:48px;border-radius:50%;
+  background:#fff;border:1px solid var(--gray-200);color:var(--gray-600);cursor:pointer;box-shadow:var(--shadow-float);
+  display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;z-index:2;
+  transform:translate(-50%,-50%) scale(.3);transition:transform .35s cubic-bezier(.34,1.56,.64,1),opacity .25s,background .2s;transition-delay:calc(var(--i)*30ms)}
+.fab2.open .node{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) translate(var(--tx),var(--ty)) scale(1)}
+.fab2 .node .lucide{width:20px;height:20px;pointer-events:none}
+.fab2 .node:hover{background:var(--primary-50);color:var(--primary-600);border-color:var(--primary-100)}
+.fab2 .node.is-danger{color:var(--danger-600)}
+.fab2 .node.is-danger:hover{background:var(--danger-50);border-color:#FECACA}
+.fab2 .node.is-active{background:var(--primary-600);color:#fff;border-color:var(--primary-600)}
+/* Translucidez en reposo: solo bordes; opaco con cursor encima (o tras primer toque en táctil) */
+.fab2.open.idle .disc{background:rgba(255,255,255,.14);border-color:rgba(59,68,208,.28)}
+.fab2.open.idle .node{background:rgba(255,255,255,.10);border-color:rgba(107,114,128,.45);color:rgba(75,85,99,.45);box-shadow:none}
+.fab2.open.idle .core{background:rgba(59,68,208,.45)}
+.fab2.open.idle .core .core-l{opacity:.55}
+.fab2 .disc,.fab2 .node,.fab2 .core{transition-property:transform,opacity,background,border-color,color,box-shadow}
+/* Tooltips de nodos */
+.fab2 .node::after{content:attr(data-tip);position:absolute;right:calc(100% + 12px);top:50%;transform:translateY(-50%);
+  background:var(--gray-900);color:#fff;font-size:11px;font-weight:600;padding:5px 10px;border-radius:6px;white-space:nowrap;
+  opacity:0;transition:opacity .15s;pointer-events:none;z-index:5}
+.fab2 .node[data-side="right"]::after{right:auto;left:calc(100% + 12px)}
+.fab2 .node:hover::after,.fab2 .node.show-tip::after{opacity:1}
+
+/* ---- Desplegable ⋯ Acciones de la herramienta ---- */
+.tool-card{position:absolute;right:calc(100% - 130px);bottom:-40px;width:236px;background:#fff;border:1px solid var(--gray-100);
+  border-radius:var(--radius);box-shadow:var(--shadow-float);padding:10px;z-index:4;
+  opacity:0;pointer-events:none;transform:translateY(8px) scale(.96);transform-origin:bottom right;transition:all .25s cubic-bezier(.34,1.56,.64,1)}
+.fab2.card-open .tool-card{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+.tool-card .tc-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-400);padding:4px 8px 8px}
+.tc-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:none;border-radius:var(--radius-sm);
+  background:transparent;font-size:13px;font-weight:500;color:var(--gray-700);cursor:pointer;text-align:left}
+.tc-item:hover{background:var(--gray-50)}
+.tc-item .lucide{width:18px;height:18px;color:var(--gray-400)}
+.tc-item:hover .lucide{color:var(--primary-600)}
+.tc-item.is-danger,.tc-item.is-danger .lucide{color:var(--danger-600)}
+.tc-item.is-danger:hover{background:var(--danger-50)}
+.tc-item .chip-ic{width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.tc-item .chip-ic .lucide{width:14px;height:14px;color:inherit}
+.ic-indigo{background:var(--primary-50);color:var(--primary-600)}
+.ic-rosa{background:var(--rosa-50);color:var(--rosa-700)}
+.ic-amarillo{background:var(--amarillo-50);color:var(--amarillo-700)}
+.ic-verde{background:var(--verde-50);color:var(--verde-700)}
+.ic-morado{background:var(--morado-50);color:var(--morado)}
+.tc-div{height:1px;background:var(--gray-100);margin:8px 4px}
+.tc-ctx-empty{font-size:11px;color:var(--gray-400);padding:6px 8px 2px;font-style:italic}
+.denom-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:2px 6px 6px}
+.denom-btn{padding:7px 2px;border-radius:var(--radius-sm);border:1.5px solid;background:#fff;font-size:11px;font-weight:700;cursor:pointer;text-align:center}
+.denom-btn:hover{transform:scale(1.07)}
+
+/* ================= SPEC VISUAL ================= */
+.spec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.spec-card h3{font-size:14px;font-weight:600;color:var(--gray-900);margin-bottom:10px;display:flex;gap:8px;align-items:center}
+.spec-card h3 .lucide{width:18px;height:18px;color:var(--primary-600)}
+.spec-card ul{list-style:none}
+.spec-card li{font-size:13px;color:var(--gray-600);padding:5px 0 5px 22px;position:relative;line-height:1.5}
+.spec-card li::before{content:"";position:absolute;left:4px;top:12px;width:7px;height:7px;border-radius:50%;background:var(--verde)}
+.clock{width:100%;max-width:280px;margin:6px auto 0;display:block}
+.rules-table{width:100%;border-collapse:collapse;font-size:13px}
+.rules-table th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-500);font-weight:600;text-align:left;padding:10px 12px;border-bottom:1px solid var(--gray-200)}
+.rules-table td{padding:12px;border-bottom:1px solid var(--gray-100);color:var(--gray-600);vertical-align:top;line-height:1.5}
+.rules-table td:first-child{font-weight:600;color:var(--gray-900);white-space:nowrap}
+.tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;margin:1px 2px}
+.tag-u{background:var(--primary-50);color:var(--primary-600)}
+.tag-p{background:var(--verde-50);color:var(--verde-700)}
+.tag-c{background:var(--amarillo-50);color:var(--amarillo-700)}
+
+.approve{margin-top:36px;background:var(--surface);border:1px solid var(--gray-100);border-left:4px solid var(--primary-600);border-radius:var(--radius-sm);box-shadow:var(--shadow-card);padding:20px}
+.approve h2{font-size:15px;font-weight:600;color:var(--gray-900);margin-bottom:10px}
+.approve label{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--gray-600);padding:6px 0;cursor:pointer;line-height:1.5}
+.approve input{margin-top:3px;accent-color:var(--primary-600)}
+@media(max-width:640px){.demo-stage{height:480px}.fab2{right:158px;bottom:168px}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="doc-header">
+    <div class="eyebrow">Manipulativos Luca · Especificación de producto</div>
+    <h1>Menú Flotante Radial v2 — diseño para aprobación</h1>
+    <p>Documento interactivo. Nada de esto toca el código de producción hasta tu visto bueno.</p>
+    <span class="pill">Pendiente de aprobación</span>
+  </header>
+
+  <!-- ============ 1. DEMO VIVO ============ -->
+  <section class="section">
+    <h2><span class="num">1</span>Demo funcional</h2>
+    <p class="sub">Todo lo que apruebes aquí es exactamente lo que se implementará. Prueba: abrir el menú, retirar el cursor (translucidez), el desplegable ⋯, seleccionar la pieza del lienzo, y «Agregar texto» (doble clic para editar).</p>
+    <div class="demo-tabs" id="demoTabs">
+      <button class="demo-tab active" data-tool="abaco">Ábaco</button>
+      <button class="demo-tab" data-tool="cubo">Cubo Base 10</button>
+      <button class="demo-tab" data-tool="tangram">Tangram</button>
+      <button class="demo-tab" data-tool="fracciones">Fracciones</button>
+    </div>
+    <p class="demo-hint" id="demoHint"></p>
+    <div class="demo-stage" id="stage">
+      <div class="brand-chip"><span class="word">Luca</span><span class="dot">.</span></div>
+      <div class="stage-total" id="stageTotal"><span class="label">Representación simbólica</span><br><span class="number">0</span></div>
+      <div class="fab2" id="fab">
+        <div class="disc"></div>
+        <div class="tool-card" id="toolCard"></div>
+        <button class="core" aria-label="Menú Luca">
+          <span class="core-l">L<span class="core-dot">.</span></span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. ANATOMÍA ============ -->
+  <section class="section">
+    <h2><span class="num">2</span>Anatomía y jerarquía</h2>
+    <p class="sub">Tres niveles claramente separados: <span class="tag tag-u">Universal</span> anillo fijo · <span class="tag tag-p">Particular</span> desplegable ⋯ · <span class="tag tag-c">Contextual</span> sección inferior del desplegable + radial junto a la pieza.</p>
+    <div class="spec-grid">
+      <div class="card spec-card">
+        <h3><i data-lucide="compass"></i>Geometría del anillo (fija en todas las herramientas)</h3>
+        <svg class="clock" viewBox="0 0 260 260">
+          <circle cx="130" cy="130" r="108" fill="rgba(255,255,255,.6)" stroke="rgba(59,68,208,.25)" stroke-width="1.5"/>
+          <circle cx="130" cy="130" r="26" fill="#3B44D0"/>
+          <text x="126" y="136" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">L</text><text x="136" y="136" text-anchor="middle" fill="#FF8283" font-size="15" font-weight="700">.</text>
+          <g font-size="10" font-weight="600" fill="#374151" text-anchor="middle">
+            <circle cx="130" cy="52" r="19" fill="#fff" stroke="#E5E7EB"/><text x="130" y="46">12</text><text x="130" y="60" font-size="8" fill="#6B7280">Vista</text>
+            <circle cx="197" cy="91" r="19" fill="#fff" stroke="#E5E7EB"/><text x="197" y="85">2</text><text x="197" y="99" font-size="8" fill="#6B7280">Capturar</text>
+            <circle cx="197" cy="169" r="19" fill="#fff" stroke="#E5E7EB"/><text x="197" y="163">4</text><text x="197" y="177" font-size="8" fill="#DC2626">Reiniciar</text>
+            <circle cx="130" cy="208" r="19" fill="#fff" stroke="#E5E7EB"/><text x="130" y="202">6</text><text x="130" y="216" font-size="8" fill="#6B7280">⋯ Acciones</text>
+            <circle cx="63" cy="169" r="19" fill="#fff" stroke="#E5E7EB"/><text x="63" y="163">8</text><text x="63" y="177" font-size="8" fill="#6B7280">Volver</text>
+            <circle cx="63" cy="91" r="19" fill="#fff" stroke="#E5E7EB"/><text x="63" y="85">10</text><text x="63" y="99" font-size="8" fill="#6B7280">Texto</text>
+          </g>
+        </svg>
+        <ul>
+          <li>Botón central 62px con el branding «L.» permanente (L blanca, punto rosa) en ambos estados · nodos 48px · radio 105px · disco 300px, blanco semitransparente plano (sin blur).</li>
+          <li>Anclado abajo-derecha, separado del borde para permitir el círculo completo.</li>
+          <li>Si una herramienta no tiene una universal (Tangram sin «Vista»), su posición queda vacía: el resto no se mueve.</li>
+        </ul>
+      </div>
+      <div class="card spec-card">
+        <h3><i data-lucide="eye-off"></i>Estados de translucidez</h3>
+        <ul>
+          <li><b>Reposo (abierto, sin cursor encima):</b> solo bordes visibles — disco al 14%, nodos al 10% con borde tenue, botón central al 45%.</li>
+          <li><b>Cursor encima:</b> opacidad completa inmediata en todo el menú.</li>
+          <li><b>Táctil (sin hover):</b> translúcido hasta el primer toque sobre el menú; después queda opaco mientras esté abierto.</li>
+          <li><b>Cerrado:</b> solo el botón central «L.» visible, opaco.</li>
+          <li><b>Chip «Luca.» superior-izquierdo:</b> translúcido permanente y no interactivo — es marca de agua, no control.</li>
+          <li>Tooltip al hover en cada nodo; en táctil, pulsación prolongada (450 ms) muestra la etiqueta sin ejecutar la acción.</li>
+        </ul>
+      </div>
+      <div class="card spec-card">
+        <h3><i data-lucide="layers"></i>Desplegable «⋯ Acciones de la herramienta»</h3>
+        <ul>
+          <li>Card vertical anclada al anillo (se abre hacia arriba-izquierda).</li>
+          <li><b>Bloque superior:</b> acciones particulares de creación/operación de la herramienta.</li>
+          <li><b>Divisor + bloque «Pieza seleccionada»:</b> aparece <u>solo</u> cuando hay una pieza/texto seleccionado en el lienzo; muestra sus acciones contextuales.</li>
+          <li>El radial pequeño junto a la pieza <b>se mantiene</b> como atajo: mismas acciones, mismo lenguaje visual.</li>
+          <li>Permanece abierto tras cada acción para crear varias piezas seguidas; se cierra al hacer clic fuera.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. AGREGAR TEXTO ============ -->
+  <section class="section">
+    <h2><span class="num">3</span>Nueva función universal: «Agregar texto»</h2>
+    <p class="sub">Disponible en las 4 herramientas (nodo a las 10 en punto). Pruébala en la demo de arriba.</p>
+    <div class="card spec-card">
+      <ul>
+        <li><b>Creación:</b> un clic crea la caja al centro del lienzo en modo edición, lista para escribir (+, −, &lt;, &gt;, números, letras, varias líneas).</li>
+        <li><b>Estilo:</b> Poppins, siempre negro. Tres tamaños S (16px) · M (26px) · L (40px); inicia en M.</li>
+        <li><b>Edición:</b> doble clic / doble toque reabre la edición. Escape o clic fuera confirma; una caja vacía se elimina sola.</li>
+        <li><b>Manipulación:</b> arrastrable como cualquier pieza; contextual radial propio: Editar · Tamaño (cicla S→M→L) · Traer al frente · Eliminar.</li>
+        <li><b>Ciclo de vida:</b> sale en «Capturar imagen»; «Reiniciar» lo elimina junto con todo lo demás.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ 4. CONTENIDO POR HERRAMIENTA ============ -->
+  <section class="section">
+    <h2><span class="num">4</span>Contenido del desplegable ⋯ por herramienta</h2>
+    <p class="sub">El anillo universal es idéntico en las 4 (con la salvedad de «Vista» en Tangram). Solo cambia el interior del desplegable.</p>
+    <div class="card" style="padding:0;overflow-x:auto">
+      <table class="rules-table">
+        <tr><th>Herramienta</th><th>Bloque particular (siempre)</th><th>Bloque contextual (solo con selección)</th></tr>
+        <tr><td>Ábaco</td><td>Rotar ábaco 90°</td><td>Solo textos: Editar · Tamaño · Traer al frente · Eliminar</td></tr>
+        <tr><td>Cubo Base 10</td><td>Unidad (1) · Decena (10) · Centena (100) · Millar (1000) — 1 clic agrega 1</td><td>Rotar · Traer al frente · Eliminar</td></tr>
+        <tr><td>Tangram</td><td>Triángulo grande · mediano · pequeño · Cuadrado · Paralelogramo — 1 clic agrega 1</td><td>Rotar 45° · Voltear · Traer al frente · Eliminar</td></tr>
+        <tr><td>Fracciones</td><td>Grid de denominadores 1 … 1/10 — 1 clic agrega 1 pieza (sin selector de cantidad)</td><td>Traer al frente · Eliminar</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 5. APROBACIÓN ============ -->
+  <section class="approve">
+    <h2>Checklist de aprobación</h2>
+    <label><input type="checkbox">Geometría: círculo completo, 6 posiciones horarias fijas, disco plano semitransparente.</label>
+    <label><input type="checkbox">Branding: «L.» permanente en el botón central (L blanca + punto rosa); chip superior translúcido permanente.</label>
+    <label><input type="checkbox">Translucidez: reposo solo-bordes → opaco con cursor; táctil opaco tras primer toque.</label>
+    <label><input type="checkbox">Jerarquía: universales en anillo · particulares en desplegable ⋯ · contextuales en sección propia solo con selección.</label>
+    <label><input type="checkbox">Se mantiene el radial pequeño junto a la pieza como atajo redundante.</label>
+    <label><input type="checkbox">«Agregar texto»: centro en edición, negro, S/M/L, editar con doble clic, entra en captura, Reiniciar lo borra.</label>
+    <label><input type="checkbox">Fracciones sin selector de cantidad: 1 clic = 1 pieza (misma lógica que Cubo).</label>
+  </section>
+</div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+/* ===================== DEMO FUNCIONAL DE LA SPEC ===================== */
+const stage = document.getElementById('stage');
+const fab = document.getElementById('fab');
+const toolCard = document.getElementById('toolCard');
+const stageTotal = document.getElementById('stageTotal');
+const icons = () => window.lucide && lucide.createIcons();
+
+const state = { tool:'abaco', open:false, card:false, selected:null, zi:30, total:0, awake:false };
+
+/* ---- Definición por herramienta ---- */
+const TOOLS = {
+  abaco: { hint:'Ábaco: sin «Vista de total» oculta no aplica — anillo completo. Particular: Rotar ábaco.', vista:true,
+    partHTML:`<button class="tc-item" data-run="demoRotate"><span class="chip-ic ic-indigo"><i data-lucide="rotate-cw"></i></span>Rotar ábaco 90°</button>` },
+  cubo: { hint:'Cubo: crea bloques desde el desplegable (1 clic = 1). Selecciona un bloque para ver su sección contextual.', vista:true,
+    partHTML:`
+      <button class="tc-item" data-add="U"><span class="chip-ic ic-indigo"><i data-lucide="square"></i></span>Unidad <span style="margin-left:auto;font-size:11px;color:var(--gray-400)">1</span></button>
+      <button class="tc-item" data-add="D"><span class="chip-ic ic-rosa"><i data-lucide="rectangle-vertical"></i></span>Decena <span style="margin-left:auto;font-size:11px;color:var(--gray-400)">10</span></button>
+      <button class="tc-item" data-add="C"><span class="chip-ic ic-amarillo"><i data-lucide="grid-3x3"></i></span>Centena <span style="margin-left:auto;font-size:11px;color:var(--gray-400)">100</span></button>
+      <button class="tc-item" data-add="M"><span class="chip-ic ic-verde"><i data-lucide="box"></i></span>Millar <span style="margin-left:auto;font-size:11px;color:var(--gray-400)">1000</span></button>`,
+    ctx:[['rotate-cw','Rotar','rotate'],['arrow-up-to-line','Traer al frente','front'],['x','Eliminar','delete','danger']] },
+  tangram: { hint:'Tangram: sin barra de total (posición «Vista» vacía, el resto no se mueve). Rotar 45° vive en el contextual.', vista:false,
+    partHTML:`
+      <button class="tc-item" data-add="tg"><span class="chip-ic ic-indigo"><i data-lucide="triangle"></i></span>Triángulo grande</button>
+      <button class="tc-item" data-add="tm"><span class="chip-ic ic-amarillo"><i data-lucide="triangle"></i></span>Triángulo mediano</button>
+      <button class="tc-item" data-add="tp"><span class="chip-ic ic-rosa"><i data-lucide="triangle"></i></span>Triángulo pequeño</button>
+      <button class="tc-item" data-add="sq"><span class="chip-ic ic-verde"><i data-lucide="square"></i></span>Cuadrado</button>
+      <button class="tc-item" data-add="pl"><span class="chip-ic ic-morado"><i data-lucide="diamond"></i></span>Paralelogramo</button>`,
+    ctx:[['rotate-cw','Rotar 45°','rotate45'],['flip-horizontal-2','Voltear','flip'],['arrow-up-to-line','Traer al frente','front'],['x','Eliminar','delete','danger']] },
+  fracciones: { hint:'Fracciones: 1 clic sobre un denominador agrega 1 pieza (sin selector de cantidad).', vista:true,
+    partHTML:`<div class="denom-grid" id="denomGrid"></div>`,
+    ctx:[['arrow-up-to-line','Traer al frente','front'],['x','Eliminar','delete','danger']] }
+};
+const DENOM_COLORS = {1:'#3B44D0',2:'#FF8283',3:'#FFBA31',4:'#32C8BD',5:'#9B59B6',6:'#E67E22',7:'#27AE60',8:'#E74C3C',9:'#16A085',10:'#2980B9'};
+const TEXT_CTX = [['pencil','Editar','edit'],['a-large-small','Tamaño S/M/L','size'],['arrow-up-to-line','Traer al frente','front'],['x','Eliminar','delete','danger']];
+
+/* ---- Anillo universal: posiciones horarias fijas ---- */
+const R = 105;
+const clockDeg = { 12:90, 2:30, 4:-30, 6:-90, 8:210, 10:150 };
+const RING = [
+  { at:12, id:'vista',  icon:'eye',        tip:'Ver / ocultar total' },
+  { at:2,  id:'capture',icon:'camera',     tip:'Capturar imagen' },
+  { at:4,  id:'reset',  icon:'trash-2',    tip:'Reiniciar', danger:true },
+  { at:6,  id:'tool',   icon:'ellipsis',   tip:'Acciones de la herramienta' },
+  { at:8,  id:'back',   icon:'arrow-left', tip:'Volver al menú' },
+  { at:10, id:'text',   icon:'type',       tip:'Agregar texto' },
+];
+function buildRing(){
+  fab.querySelectorAll('.node').forEach(n=>n.remove());
+  const t = TOOLS[state.tool];
+  RING.forEach((def,i)=>{
+    if(def.id==='vista' && !t.vista) return;               /* slot vacío, posiciones intactas */
+    const a = clockDeg[def.at]*Math.PI/180;
+    const el = document.createElement('button');
+    el.className = 'node'+(def.danger?' is-danger':'');
+    el.dataset.id = def.id; el.dataset.tip = def.tip;
+    if(def.at===2||def.at===4) el.dataset.side='right';
+    el.style.setProperty('--tx',(R*Math.cos(a)).toFixed(1)+'px');
+    el.style.setProperty('--ty',(-R*Math.sin(a)).toFixed(1)+'px');
+    el.style.setProperty('--i',i);
+    el.innerHTML = `<i data-lucide="${def.icon}"></i>`;
+    el.addEventListener('click',()=>runUniversal(def.id,el));
+    fab.appendChild(el);
+  });
+  icons();
+}
+function runUniversal(id,el){
+  wake();
+  if(id==='back'){ flashMsg('Navegaría al Index'); setOpen(false); }
+  if(id==='vista'){ stageTotal.classList.toggle('hidden'); el.classList.toggle('is-active'); }
+  if(id==='capture'){ flash(); }
+  if(id==='reset'){ stage.querySelectorAll('.demo-piece,.free-text').forEach(p=>p.remove()); state.selected=null; state.total=0; renderTotal(); renderCard(); }
+  if(id==='tool'){ setCard(!state.card); }
+  if(id==='text'){ addText(); }
+}
+
+/* ---- Apertura / translucidez ---- */
+function setOpen(v){ state.open=v; fab.classList.toggle('open',v); if(!v){ setCard(false); } setIdle(true); state.awake=false; }
+function setCard(v){ state.card=v; fab.classList.toggle('card-open',v);
+  const t=fab.querySelector('[data-id="tool"]'); if(t) t.classList.toggle('is-active',v); if(v) renderCard(); }
+function setIdle(v){ fab.classList.toggle('idle', v && state.open); }
+function wake(){ state.awake=true; setIdle(false); }
+fab.addEventListener('pointerenter',e=>{ if(e.pointerType!=='touch') setIdle(false); });
+fab.addEventListener('pointerleave',e=>{ if(e.pointerType!=='touch' && !state.card) setIdle(true); });
+fab.addEventListener('pointerdown',e=>{ if(e.pointerType==='touch') wake(); });   /* táctil: opaco tras primer toque */
+fab.querySelector('.core').addEventListener('click',()=>setOpen(!state.open));
+document.addEventListener('pointerdown',e=>{
+  if(!e.target.closest('.fab2') && !e.target.closest('.demo-piece') && !e.target.closest('.free-text') && state.card) setCard(false);
+});
+
+/* ---- Desplegable ⋯: particular + contextual ---- */
+function renderCard(){
+  const t = TOOLS[state.tool];
+  let html = `<div class="tc-title">Acciones de la herramienta</div>${t.partHTML}`;
+  const sel = state.selected;
+  if(sel){
+    const isText = sel.classList.contains('free-text');
+    const ctx = isText ? TEXT_CTX : (t.ctx||[]);
+    if(ctx.length){
+      html += `<div class="tc-div"></div><div class="tc-title">${isText?'Texto seleccionado':'Pieza seleccionada'}</div>`;
+      ctx.forEach(([ic,label,act,dan])=>{
+        html += `<button class="tc-item${dan?' is-danger':''}" data-ctx="${act}"><i data-lucide="${ic}"></i>${label}</button>`;
+      });
+    }
+  } else {
+    html += `<div class="tc-div"></div><div class="tc-ctx-empty">Selecciona una pieza para ver sus acciones</div>`;
+  }
+  toolCard.innerHTML = html;
+  if(state.tool==='fracciones'){
+    const g = toolCard.querySelector('#denomGrid');
+    for(let d=1;d<=10;d++){
+      const b=document.createElement('button'); b.className='denom-btn';
+      b.style.borderColor=DENOM_COLORS[d]; b.style.color=DENOM_COLORS[d];
+      b.textContent = d===1?'1':'1/'+d;
+      b.onclick=()=>addPiece('frac',d);
+      g.appendChild(b);
+    }
+  }
+  toolCard.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>addPiece(b.dataset.add));
+  toolCard.querySelectorAll('[data-run="demoRotate"]').forEach(b=>b.onclick=()=>flashMsg('El ábaco rotaría 90°'));
+  toolCard.querySelectorAll('[data-ctx]').forEach(b=>b.onclick=()=>runCtx(b.dataset.ctx));
+  icons();
+}
+
+/* ---- Piezas demo ---- */
+const VALS={U:1,D:10,C:100,M:1000};
+function addPiece(kind,denom){
+  const p=document.createElement('div'); p.className='demo-piece';
+  const sh=document.createElement('div'); sh.className='shape';
+  if(kind==='U'||kind==='D'||kind==='C'||kind==='M'){
+    const c={U:'#3B44D0',D:'#FF8283',C:'#FFBA31',M:'#32C8BD'}[kind];
+    const s={U:34,D:34,C:58,M:74}[kind];
+    sh.style.cssText=`width:${s}px;height:${kind==='D'?110:s}px;background:${c};border-radius:6px;border:1px solid rgba(0,0,0,.2)`;
+    p.dataset.val=VALS[kind]; state.total+=VALS[kind];
+  } else if(kind==='frac'){
+    const c=DENOM_COLORS[denom], frac=denom===1?360:360/denom;
+    sh.style.cssText=`width:92px;height:92px;border-radius:50%;background:conic-gradient(${c} 0deg ${frac}deg, rgba(0,0,0,.06) ${frac}deg 360deg);border:2px solid ${c}`;
+  } else {
+    const c={tg:'#3B44D0',tm:'#FFBA31',tp:'#FF8283',sq:'#32C8BD',pl:'#512DA8'}[kind];
+    if(kind==='sq'){ sh.style.cssText=`width:52px;height:52px;background:${c}`; }
+    else if(kind==='pl'){ sh.style.cssText=`width:88px;height:44px;background:${c};transform:skewX(-24deg)`; }
+    else { const s={tg:96,tm:66,tp:48}[kind];
+      sh.style.cssText=`width:0;height:0;border-left:${s}px solid ${c};border-top:${s}px solid transparent`; }
+  }
+  const ctx=buildCtx((state.tool && TOOLS[state.tool].ctx)||[]);
+  p.appendChild(ctx); p.appendChild(sh);
+  const off=(stage.querySelectorAll('.demo-piece').length%5)*18;
+  p.style.left=(stage.offsetWidth*0.32+off)+'px'; p.style.top=(stage.offsetHeight*0.34+off)+'px';
+  p.style.zIndex=state.zi++;
+  makeSelectable(p); makeDraggable(p);
+  stage.appendChild(p); icons(); renderTotal();
+}
+function buildCtx(defs){
+  const wrap=document.createElement('div'); wrap.className='ctx-radial';
+  const Rc=50,n=defs.length;
+  defs.forEach(([ic,tip,act,dan],i)=>{
+    const a=(n>1?150-i*(120/(n-1)):90)*Math.PI/180;
+    const el=document.createElement('button');
+    el.className='ctx-node'+(dan?' is-danger':''); el.dataset.tip=tip; el.dataset.act=act;
+    el.style.setProperty('--tx',(Rc*Math.cos(a)).toFixed(1)+'px');
+    el.style.setProperty('--ty',(-Rc*Math.sin(a)-12).toFixed(1)+'px');
+    el.style.setProperty('--i',i);
+    el.innerHTML=`<i data-lucide="${ic}"></i>`;
+    el.onclick=e=>{e.stopPropagation();runCtx(act);};
+    wrap.appendChild(el);
+  });
+  return wrap;
+}
+function runCtx(act){
+  const s=state.selected; if(!s) return;
+  if(act==='delete'){ if(s.dataset.val) state.total-=parseInt(s.dataset.val); s.remove(); state.selected=null; renderTotal(); }
+  if(act==='front'){ s.style.zIndex=state.zi++; }
+  if(act==='rotate'||act==='rotate45'){ const r=((parseInt(s.dataset.rot)||0)+45)%360; s.dataset.rot=r; s.querySelector('.shape').style.rotate=r+'deg'; }
+  if(act==='flip'){ const f=s.dataset.flip==='1'?'':'1'; s.dataset.flip=f; s.querySelector('.shape').style.scale=f?'-1 1':'1 1'; }
+  if(act==='edit'){ startEdit(s); }
+  if(act==='size'){ const order=['size-S','size-M','size-L']; const cur=order.findIndex(c=>s.classList.contains(c));
+    s.classList.remove(order[cur]); s.classList.add(order[(cur+1)%3]); }
+  if(state.card) renderCard();
+}
+function makeSelectable(el){
+  el.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.ctx-node')) return;
+    stage.querySelectorAll('.selected').forEach(x=>x.classList.remove('selected'));
+    el.classList.add('selected'); state.selected=el; el.style.zIndex=state.zi++;
+    if(state.card) renderCard();
+  });
+}
+function makeDraggable(el){
+  let ox,oy,drag=false;
+  el.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.ctx-node')||el.classList.contains('editing')) return;
+    drag=true; ox=e.clientX-el.offsetLeft; oy=e.clientY-el.offsetTop;
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  el.addEventListener('pointermove',e=>{ if(drag){ el.style.left=(e.clientX-ox)+'px'; el.style.top=(e.clientY-oy)+'px'; }});
+  el.addEventListener('pointerup',()=>drag=false);
+}
+stage.addEventListener('pointerdown',e=>{
+  if(e.target===stage){ stage.querySelectorAll('.selected').forEach(x=>x.classList.remove('selected'));
+    state.selected=null; if(state.card) renderCard(); }
+});
+
+/* ---- Texto libre ---- */
+function addText(){
+  const t=document.createElement('div');
+  t.className='free-text size-M editing'; t.contentEditable='true'; t.spellcheck=false;
+  t.style.left=(stage.offsetWidth/2-40)+'px'; t.style.top=(stage.offsetHeight/2-60)+'px'; t.style.zIndex=state.zi++;
+  t.appendChild(buildCtx(TEXT_CTX));
+  makeSelectable(t); makeDraggable(t);
+  t.addEventListener('dblclick',()=>startEdit(t));
+  t.addEventListener('blur',()=>endEdit(t));
+  t.addEventListener('keydown',e=>{ if(e.key==='Escape') t.blur(); });
+  stage.appendChild(t); icons();
+  t.focus();
+}
+function startEdit(t){ t.classList.add('editing'); t.contentEditable='true'; t.focus();
+  const r=document.createRange(); r.selectNodeContents(t); r.collapse(false);
+  const s=getSelection(); s.removeAllRanges(); s.addRange(r); }
+function endEdit(t){
+  t.classList.remove('editing'); t.contentEditable='false';
+  const txt=[...t.childNodes].filter(n=>n.nodeType===3||n.nodeName==='BR'||n.nodeName==='DIV').map(n=>n.textContent).join('').trim();
+  if(!txt){ t.remove(); if(state.selected===t) state.selected=null; }
+}
+
+/* ---- Utilidades demo ---- */
+function renderTotal(){ stageTotal.querySelector('.number').textContent=state.total; }
+function flash(){ const o=document.createElement('div');
+  o.style.cssText='position:absolute;inset:0;background:#fff;z-index:2000;pointer-events:none;animation:specFlash .5s ease-out forwards';
+  stage.appendChild(o); setTimeout(()=>o.remove(),550); }
+const st=document.createElement('style'); st.textContent='@keyframes specFlash{0%{opacity:0}10%{opacity:1}100%{opacity:0}}'; document.head.appendChild(st);
+function flashMsg(msg){ const m=document.createElement('div');
+  m.style.cssText='position:absolute;top:16px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;font-size:12px;font-weight:600;padding:8px 16px;border-radius:999px;z-index:2001';
+  m.textContent=msg; stage.appendChild(m); setTimeout(()=>m.remove(),1400); }
+
+/* ---- Tabs ---- */
+document.getElementById('demoTabs').addEventListener('click',e=>{
+  const b=e.target.closest('.demo-tab'); if(!b) return;
+  document.querySelectorAll('.demo-tab').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+  state.tool=b.dataset.tool; state.selected=null; state.total=0;
+  stage.querySelectorAll('.demo-piece,.free-text').forEach(p=>p.remove());
+  stageTotal.classList.toggle('hidden', !TOOLS[state.tool].vista);
+  renderTotal(); document.getElementById('demoHint').textContent=TOOLS[state.tool].hint;
+  buildRing(); if(state.card) renderCard();
+});
+document.getElementById('demoHint').textContent=TOOLS.abaco.hint;
+buildRing(); setOpen(true); setIdle(true); icons();
+</script>
+</body>
+</html>

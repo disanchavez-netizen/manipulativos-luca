@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    /* Único manipulativo con lienzo blanco: máximo contraste de clavos y ligas */
+    #canvas { background: #FFFFFF; }
+
+    #board { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    #board .nail-hit  { fill: transparent; cursor: pointer; }
+    #board .nail      { fill: #E3E6EC; stroke: #B9BFCA; stroke-width: 1; pointer-events: none; transition: fill .15s; }
+    #board .nail-core { fill: #A7ADBB; pointer-events: none; }
+    #board .nail-hit:hover + .nail { fill: var(--primary-100); }
+    #board .liga-fill   { stroke: none; pointer-events: none; }
+    #board .liga-stroke { fill: none; stroke-linejoin: round; stroke-linecap: round; cursor: pointer; pointer-events: none; }
+    /* Indicadores de la liga seleccionada: siempre por encima de todo */
+    #board .vertex-ring { fill: none; stroke: var(--primary-600); stroke-width: 1.8; pointer-events: none; }
+    #board .seg-taken   { fill: none; stroke: var(--primary-600); stroke-width: 3; stroke-dasharray: 6 6;
+      stroke-linecap: round; pointer-events: none; animation: dashMove 1s linear infinite; }
+    @keyframes dashMove { to { stroke-dashoffset: -24; } }
+    #board .pop { fill: none; stroke: var(--primary-600); stroke-width: 2.5; pointer-events: none; animation: nailPop .45s ease-out forwards; }
+    @keyframes nailPop { from { opacity: 1; r: 6; } to { opacity: 0; r: 20; } }
+
+    /* Ancla HTML del contextual radial de la liga (las ligas viven en SVG) */
+    .liga-anchor { position: absolute; width: 0; height: 0; z-index: 1000; pointer-events: none; }
+
+    /* Controles propios del desplegable ⋯ */
+    .mode-toggle { display: flex; gap: 6px; padding: 2px 8px 8px; }
+    .mode-btn { flex: 1; padding: 7px 4px; border-radius: 999px; border: 1px solid var(--gray-200); background: #fff;
+      font-size: 12px; font-weight: 600; color: var(--gray-500); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .mode-btn .lucide { width: 14px; height: 14px; }
+    .mode-btn.active { background: var(--primary-600); border-color: var(--primary-600); color: #fff; }
+    .swatch-row { display: flex; gap: 7px; padding: 2px 8px 8px; flex-wrap: wrap; }
+    .swatch { width: 24px; height: 24px; border-radius: 50%; border: none; cursor: pointer; transition: transform .15s;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+    .swatch:hover { transform: scale(1.15); }
+
+    /* Aviso breve sobre el lienzo */
+    .geo-toast { position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+      background: var(--gray-900); color: #fff; font-size: 12px; font-weight: 600;
+      padding: 8px 16px; border-radius: 999px; z-index: 2001; pointer-events: none;
+      animation: geoToast 1.6s ease-out forwards; }
+    @keyframes geoToast { 0% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+      12%, 82% { opacity: 1; transform: translateX(-50%) translateY(0); } 100% { opacity: 0; } }
+
+    #canvasHint { position: absolute; top: 45%; left: 50%; transform: translate(-50%,-50%);
+      text-align: center; color: var(--gray-400); pointer-events: none; transition: opacity .4s; z-index: 4; }
+    #canvasHint .lucide { width: 48px; height: 48px; margin-bottom: 10px; }
+    #canvasHint p { font-size: 14px; font-weight: 500; }
+  </style>
+</head>
+<body>
+<div class="brand-chip"><span class="word">Luca</span><span class="dot">.</span></div>
+
+<div class="app">
+  <div class="workspace">
+    <div id="canvas">
+      <svg id="board"></svg>
+      <div id="canvasHint">
+        <i data-lucide="hand-metal"></i>
+        <p>Abre el menú L. → ⋯ y toca un color<br>para agregar tu primera liga</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="assets/comun.js"></script>
+<script>
+  const app = {
+    canvas: null, board: null, canvasHint: null, anchor: null,
+
+    PALETTE: ['#3B44D0', '#FF8283', '#FFBA31', '#32C8BD', '#512DA8', '#E67E22', '#2980B9', '#E74C3C'],
+    NAIL_TOL: 13, SEG_TOL: 14,
+
+    mode: 'cuadrado',        /* 'cuadrado' (11×11) | 'radial' (1 + 3×12) */
+    nails: [], ligas: [],    /* liga: { color, verts:[nailIndex] } — orden del array = z */
+    sel: null, seg: null,    /* liga seleccionada y tramo tomado */
+    _pieceHit: false,        /* el último pointerdown en el tablero cayó sobre liga/acción */
+
+    /* ================= Clavos ================= */
+    buildNails() {
+      this.nails = [];
+      const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+      if (this.mode === 'cuadrado') {
+        const pad = 54, s = (Math.min(w, h) - pad * 2) / 10;
+        const ox = (w - s * 10) / 2, oy = (h - s * 10) / 2;
+        for (let r = 0; r < 11; r++) for (let c = 0; c < 11; c++) this.nails.push({ x: ox + c * s, y: oy + r * s });
+      } else {
+        const cx = w / 2, cy = h / 2, maxR = (Math.min(w, h) - 108) / 2;
+        this.nails.push({ x: cx, y: cy });
+        for (let ring = 1; ring <= 3; ring++) for (let k = 0; k < 12; k++) {
+          const a = (k * 30 - 90) * Math.PI / 180, r = maxR * ring / 3;
+          this.nails.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+        }
+      }
+    },
+
+    /* ================= Render: clavos (base) → ligas (frente) → indicadores (cima) ================= */
+    svgEl(tag, attrs) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for (const k in attrs) el.setAttribute(k, attrs[k]);
+      return el;
+    },
+
+    render() {
+      this.board.innerHTML = '';
+      /* 1. Clavos: capa base */
+      this.nails.forEach(p => {
+        this.board.appendChild(this.svgEl('circle', { class: 'nail-hit',  cx: p.x, cy: p.y, r: 13 }));
+        this.board.appendChild(this.svgEl('circle', { class: 'nail',      cx: p.x, cy: p.y, r: 5.5 }));
+        this.board.appendChild(this.svgEl('circle', { class: 'nail-core', cx: p.x, cy: p.y, r: 1.8 }));
+      });
+      /* 2. Ligas por delante de los clavos (orden = z) */
+      this.ligas.forEach(l => {
+        const pts = l.verts.map(i => this.nails[i]);
+        const ptStr = pts.map(p => p.x + ',' + p.y).join(' ');
+        if (pts.length >= 3)
+          this.board.appendChild(this.svgEl('polygon', { class: 'liga-fill', points: ptStr, fill: l.color, 'fill-opacity': .45 }));
+        this.board.appendChild(this.svgEl(pts.length >= 3 ? 'polygon' : 'polyline',
+          { class: 'liga-stroke', points: ptStr, stroke: l.color, 'stroke-width': 6 }));
+      });
+      /* 3. Indicadores de la liga seleccionada: siempre visibles sobre todo */
+      if (this.sel) {
+        const pts = this.sel.verts.map(i => this.nails[i]);
+        if (this.seg !== null) {
+          const a = pts[this.seg], b = pts[(this.seg + 1) % pts.length];
+          this.board.appendChild(this.svgEl('line', { class: 'seg-taken', x1: a.x, y1: a.y, x2: b.x, y2: b.y }));
+        }
+        pts.forEach(p => this.board.appendChild(this.svgEl('circle', { class: 'vertex-ring', cx: p.x, cy: p.y, r: 9 })));
+      }
+      this.placeCtx();
+      this.canvasHint.style.opacity = (this.ligas.length || this.canvas.querySelector('.free-text')) ? '0' : '1';
+    },
+
+    /* ================= Geometría: detección por coordenadas (tolerante) ================= */
+    distToSeg(px, py, a, b) {
+      const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+      const t = len2 ? Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / len2)) : 0;
+      return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+    },
+    nailAt(x, y) {
+      let best = -1, bd = this.NAIL_TOL;
+      this.nails.forEach((p, i) => { const d = Math.hypot(x - p.x, y - p.y); if (d < bd) { bd = d; best = i; } });
+      return best;
+    },
+    /* Tramo bajo el punto: prioridad a la liga superior (última en z) */
+    segAt(x, y) {
+      for (let li = this.ligas.length - 1; li >= 0; li--) {
+        const l = this.ligas[li], pts = l.verts.map(i => this.nails[i]);
+        const n = pts.length, segs = n >= 3 ? n : n - 1;
+        let best = -1, bd = this.SEG_TOL;
+        for (let i = 0; i < segs; i++) {
+          const d = this.distToSeg(x, y, pts[i], pts[(i + 1) % n]);
+          if (d < bd) { bd = d; best = i; }
+        }
+        if (best >= 0) return { liga: l, seg: best };
+      }
+      return null;
+    },
+
+    /* ================= Dinámica: prioridad según intención =================
+       Con tramo tomado: el clavo gana (atorar / desatorar).
+       Sin tramo tomado: la liga gana; el clavo-vértice conserva prioridad para desatorar. */
+    onBoardDown(e) {
+      const r = this.board.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      const nail = this.nailAt(x, y);
+      const hit = this.segAt(x, y);
+      this._pieceHit = true;
+
+      if (this.sel && this.seg !== null) {          /* --- tramo tomado: clavo primero --- */
+        if (nail >= 0) {
+          const vi = this.sel.verts.indexOf(nail);
+          if (vi >= 0) { this.desatorar(vi); return; }
+          this.atorar(nail); return;
+        }
+        if (hit) { this.takeSegment(hit.liga, hit.seg); return; }   /* re-tomar otro tramo */
+        this._pieceHit = false; this.deselect(); return;
+      }
+
+      /* --- sin tramo tomado: liga primero --- */
+      if (this.sel && nail >= 0) {
+        const vi = this.sel.verts.indexOf(nail);
+        if (vi >= 0) { this.desatorar(vi); return; }  /* el vértice es más específico que el tramo */
+      }
+      if (hit) { this.takeSegment(hit.liga, hit.seg); return; }
+      if (nail >= 0) { if (this.ligas.length) this.toast('Toca primero un tramo de una liga'); return; }
+      this._pieceHit = false; this.deselect();
+    },
+
+    takeSegment(l, i) {
+      Luca.text.deselect();
+      this.sel = l; this.seg = i;
+      this.render(); Luca.fab.refreshCard();
+    },
+    atorar(nail) {
+      this.sel.verts.splice(this.seg + 1, 0, nail);
+      this.seg = null; this.render();
+      this.board.appendChild(this.svgEl('circle', { class: 'pop', cx: this.nails[nail].x, cy: this.nails[nail].y, r: 6 }));
+      Luca.fab.refreshCard();
+    },
+    desatorar(vi) {
+      if (this.sel.verts.length <= 2) { this.toast('Una liga necesita al menos 2 clavos'); return; }
+      this.sel.verts.splice(vi, 1); this.seg = null;
+      this.render(); Luca.fab.refreshCard();
+    },
+
+    /* ================= Ligas ================= */
+    addLiga(color) {
+      const w = this.canvas.clientWidth, h = this.canvas.clientHeight, cx = w / 2, cy = h / 2;
+      /* dos clavos adyacentes cercanos al centro, con desfase por liga */
+      const sorted = this.nails.map((p, i) => ({ i, d: Math.hypot(p.x - cx, p.y - cy) })).sort((a, b) => a.d - b.d);
+      const off = (this.ligas.length * 2) % Math.max(2, sorted.length - 1);
+      const a = sorted[off].i;
+      const pa = this.nails[a];
+      const b = this.nails.map((p, i) => ({ i, d: Math.hypot(p.x - pa.x, p.y - pa.y) }))
+        .filter(o => o.i !== a).sort((x, y) => x.d - y.d)[0].i;
+      const l = { color, verts: [a, b] };
+      this.ligas.push(l);
+      Luca.text.deselect();
+      this.sel = l; this.seg = 0;    /* nace con el tramo tomado: el siguiente clic ya atora */
+      this.render(); Luca.fab.refreshCard();
+    },
+    deleteLiga(l) {
+      this.ligas = this.ligas.filter(x => x !== l);
+      if (this.sel === l) { this.sel = null; this.seg = null; }
+      this.render(); Luca.fab.refreshCard();
+    },
+    frontLiga(l) {
+      this.ligas = this.ligas.filter(x => x !== l); this.ligas.push(l);
+      this.render();
+    },
+    deselect() {
+      if (!this.sel) return;
+      this.sel = null; this.seg = null;
+      this.render(); Luca.fab.refreshCard();
+    },
+
+    /* Contextual radial junto a la liga (ancla HTML sobre el SVG) */
+    placeCtx() {
+      if (this.anchor) { this.anchor.remove(); this.anchor = null; }
+      const l = this.sel; if (!l) return;
+      const pts = l.verts.map(i => this.nails[i]);
+      const topY = Math.min(...pts.map(p => p.y));
+      const midX = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      const anchor = document.createElement('div');
+      anchor.className = 'liga-anchor selected';          /* .selected habilita .ctx-radial del DS */
+      anchor.style.left = midX + 'px';
+      anchor.style.top = (topY - 6) + 'px';
+      const menu = Luca.ctxRadial([
+        { action: 'front',  icon: 'arrow-up-to-line', tip: 'Traer al frente' },
+        { action: 'delete', icon: 'x',                tip: 'Eliminar', danger: true }
+      ]);
+      menu.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn || btn.dataset.lp) return;
+        e.stopPropagation();
+        this.runCtx(btn.dataset.action);
+      });
+      anchor.appendChild(menu);
+      this.canvas.appendChild(anchor);
+      this.anchor = anchor;
+      Luca.icons();
+    },
+    runCtx(a) {
+      if (!this.sel) return;
+      if (a === 'front') this.frontLiga(this.sel);
+      else if (a === 'delete') this.deleteLiga(this.sel);
+    },
+
+    /* ================= Herramienta ================= */
+    setMode(m) {
+      if (m === this.mode) return;
+      this.mode = m;
+      this.ligas = []; this.sel = null; this.seg = null;   /* modos excluyentes: limpia el lienzo */
+      Luca.text.clear();
+      this.buildNails(); this.render(); Luca.fab.refreshCard();
+    },
+    clearCanvas() {
+      this.ligas = []; this.sel = null; this.seg = null;
+      Luca.text.clear();
+      this.render(); Luca.fab.refreshCard();
+    },
+    toast(msg) {
+      const m = document.createElement('div');
+      m.className = 'geo-toast'; m.textContent = msg;
+      this.canvas.appendChild(m);
+      setTimeout(() => m.remove(), 1700);
+    },
+
+    /* ================= Init ================= */
+    init() {
+      this.canvas = document.getElementById('canvas');
+      this.board = document.getElementById('board');
+      this.canvasHint = document.getElementById('canvasHint');
+
+      Luca.text.init(this.canvas, { onSelectionChange: () => { this.sel = null; this.seg = null; this.render(); } });
+
+      Luca.fab.init({
+        /* Sin «Vista»: la posición 12 queda vacía, como en Tangram */
+        capture: () => Luca.capturar(this.canvas, 'geoplano-luca'),
+        reset: () => this.clearCanvas(),
+        resetTip: 'Reiniciar lienzo',
+        isPiece: (t) => (t.closest && t.closest('#board')) ? this._pieceHit : false,
+        buildPart: (el) => {
+          /* Toggle de matriz */
+          const tg = document.createElement('div'); tg.className = 'mode-toggle';
+          [['cuadrado', 'grid-3x3', 'Cuadrado'], ['radial', 'circle-dot', 'Radial']].forEach(([m, ic, label]) => {
+            const b = document.createElement('button');
+            b.className = 'mode-btn' + (this.mode === m ? ' active' : '');
+            b.innerHTML = `<i data-lucide="${ic}"></i>${label}`;
+            b.addEventListener('click', () => this.setMode(m));
+            tg.appendChild(b);
+          });
+          el.appendChild(tg);
+          /* Un clic en el color agrega la liga al instante */
+          const tt = document.createElement('div'); tt.className = 'tc-title';
+          tt.style.paddingTop = '6px'; tt.textContent = 'Agregar liga — toca un color';
+          el.appendChild(tt);
+          const row = document.createElement('div'); row.className = 'swatch-row';
+          this.PALETTE.forEach(c => {
+            const s = document.createElement('button');
+            s.className = 'swatch'; s.style.background = c;
+            s.setAttribute('aria-label', 'Agregar liga de color ' + c);
+            s.addEventListener('click', () => this.addLiga(c));
+            row.appendChild(s);
+          });
+          el.appendChild(row);
+        },
+        getCtx: () => this.sel ? {
+          title: 'Liga seleccionada',
+          items: [
+            { icon: 'arrow-up-to-line', tip: 'Traer al frente', action: 'front' },
+            { icon: 'x',                tip: 'Eliminar',        action: 'delete', danger: true },
+          ],
+          run: (a) => this.runCtx(a)
+        } : null
+      });
+
+      this.board.addEventListener('pointerdown', (e) => this.onBoardDown(e));
+
+      /* Resize: recalcular posiciones (los índices de clavo se conservan por modo) */
+      let rT = null;
+      window.addEventListener('resize', () => {
+        clearTimeout(rT);
+        rT = setTimeout(() => { this.buildNails(); this.render(); }, 120);
+      });
+
+      this.buildNails();
+      this.render();
+    }
+  };
+
+  window.addEventListener('DOMContentLoaded', () => app.init());
+</script>
+  <script>
+    /* User Guide (coach marks) — se abre desde el nodo «?» del radial */
+    window.addEventListener('DOMContentLoaded', function () {
+      Luca.guide.init('geoplano', [
+        { el: '#board', title: 'El tablero', text: 'Estira ligas entre los clavos: toca un clavo y arrastra para formar polígonos.' },
+        { el: '.fab2 [data-id=\'tool\']', title: 'Acciones del geoplano', text: 'Cambia la matriz (cuadrada o radial) y el color de las ligas desde «⋯ Acciones».', before: () => Luca.fab.setOpen(true) },
+      ].concat(Luca.guide.commonSteps()));
+    });
+  </script>
+</body>
+</html>

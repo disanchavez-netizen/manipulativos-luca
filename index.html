@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Luca · Manipulativos Singapur</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    /* ---------- Página: Index (Home v3 aprobado: gráfico, sin pills) ---------- */
+    body{color:var(--gray-900)}
+
+    /* Tapiz de manipulativos en trazo indigo (D4) */
+    .wallpaper{
+      position:fixed;inset:0;z-index:0;pointer-events:none;
+      background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360'><g fill='none' stroke='%233B44D0' stroke-opacity='0.11' stroke-width='3'><g transform='translate(38,34) rotate(-8)'><line x1='16' y1='0' x2='16' y2='58'/><circle cx='16' cy='14' r='8'/><circle cx='16' cy='31' r='8'/><circle cx='16' cy='48' r='8'/></g><g transform='translate(206,26) rotate(10)'><path d='M0 44 L44 44 L22 0 Z'/></g><g transform='translate(120,120) rotate(-6)'><circle cx='24' cy='24' r='22'/><circle cx='24' cy='24' r='14'/></g><g transform='translate(268,140) rotate(6)'><rect x='0' y='0' width='52' height='30' rx='4'/><circle cx='26' cy='15' r='8'/></g><g transform='translate(30,190) rotate(4)'><rect x='0' y='0' width='46' height='46' rx='6'/><line x1='0' y1='15' x2='46' y2='15'/><line x1='0' y1='31' x2='46' y2='31'/><line x1='15' y1='0' x2='15' y2='46'/><line x1='31' y1='0' x2='31' y2='46'/></g><g transform='translate(150,236) rotate(-10)'><path d='M0 26 A26 26 0 0 1 52 26 Z'/></g><g transform='translate(256,254) rotate(-4)' stroke-width='2.4'><circle cx='4' cy='4' r='2.4'/><circle cx='24' cy='4' r='2.4'/><circle cx='44' cy='4' r='2.4'/><circle cx='4' cy='24' r='2.4'/><circle cx='24' cy='24' r='2.4'/><circle cx='44' cy='24' r='2.4'/><circle cx='4' cy='44' r='2.4'/><circle cx='24' cy='44' r='2.4'/><circle cx='44' cy='44' r='2.4'/><path d='M4 4 L44 24 L24 44 Z'/></g><g transform='translate(56,300) rotate(8)'><rect x='0' y='0' width='58' height='14' rx='4'/><line x1='29' y1='0' x2='29' y2='14'/></g></g></svg>");
+      background-size:360px 360px;
+    }
+
+    .page{position:relative;z-index:1;min-height:100vh;padding:48px 32px 72px;max-width:1120px;margin:0 auto}
+
+    /* Header · D7 subtítulo «Manipulativos Singapur» */
+    .page-header{text-align:center;margin-bottom:40px}
+    .page-header .logo{display:flex;align-items:baseline;justify-content:center;gap:1px;margin-bottom:10px}
+    .page-header .logo .word{font-size:34px;font-weight:700;color:var(--primary-600);letter-spacing:-.5px}
+    .page-header .logo .dot{font-size:34px;font-weight:700;color:var(--rosa)}
+    .page-header h1{font-size:24px;font-weight:600;color:var(--gray-900);margin-bottom:6px}
+    .page-header p{font-size:15px;color:var(--gray-500)}
+
+    /* Cards gráficas (D1–D3) */
+    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:24px}
+    .card{
+      position:relative;background:var(--surface);border:1px solid var(--gray-100);border-radius:var(--radius);
+      box-shadow:var(--shadow-card);cursor:pointer;transition:box-shadow .25s,transform .25s;
+    }
+    .card:hover,.card:focus-visible{transform:translateY(-4px);box-shadow:var(--shadow-card-hover);outline:none}
+    .card:focus-visible{border-color:var(--primary-600)}
+
+    .stage{
+      aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(165deg,var(--tint) 0%,#FDFDFE 88%);
+      border-radius:var(--radius) var(--radius) 0 0;
+    }
+    .stage svg{width:74%;height:auto;transition:transform .3s ease}
+    .card:hover .stage svg{transform:scale(1.05)}
+
+    .name{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-top:1px solid var(--gray-100)}
+    .name h3{font-size:16px;font-weight:600;color:var(--gray-900)}
+    .name .arrow{color:var(--gray-400);transition:transform .25s,color .25s;flex:none}
+    .card:hover .arrow{transform:translateX(4px);color:var(--primary-600)}
+
+    /* Botón «?» + popover con descripción (D8 del Home) */
+    .help{
+      position:absolute;top:10px;right:10px;z-index:5;width:26px;height:26px;border-radius:50%;
+      border:1.5px solid var(--gray-200);background:rgba(255,255,255,.9);color:var(--gray-500);
+      font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;
+      transition:color .2s,border-color .2s;
+    }
+    .help:hover,.help[aria-expanded="true"]{color:var(--primary-600);border-color:var(--primary-600)}
+    .pop{
+      position:absolute;top:42px;right:10px;z-index:6;width:212px;
+      background:var(--surface);border:1px solid var(--gray-200);border-radius:var(--radius-sm);
+      box-shadow:var(--shadow-float);padding:12px 14px;font-size:13px;line-height:1.5;color:var(--gray-700);
+      opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .2s,transform .2s,visibility .2s;
+    }
+    .card.pop-open .pop{opacity:1;visibility:visible;transform:translateY(0)}
+
+    /* Tinte sutil por herramienta */
+    .t-abaco   {--tint:rgba(252,225,75,.16)}
+    .t-cubo    {--tint:rgba(255,186,49,.13)}
+    .t-tangram {--tint:rgba(59,68,208,.07)}
+    .t-fracc   {--tint:rgba(255,130,131,.10)}
+    .t-fichas  {--tint:rgba(229,85,79,.08)}
+    .t-banco   {--tint:rgba(229,115,111,.10)}
+    .t-geo     {--tint:rgba(59,68,208,.04)}
+
+    @media (max-width:640px){.page{padding:32px 20px 48px}}
+    @media (prefers-reduced-motion:reduce){.card,.stage svg,.arrow,.pop{transition:none}}
+  </style>
+</head>
+<body>
+  <div class="wallpaper" aria-hidden="true"></div>
+
+  <main class="page">
+    <header class="page-header">
+      <div class="logo"><span class="word">Luca</span><span class="dot">.</span></div>
+      <h1>Manipulativos Singapur</h1>
+      <p>Elige una herramienta para comenzar.</p>
+    </header>
+
+    <section class="cards">
+    <div class="card" role="button" tabindex="0" aria-label="Ábaco" data-route="Abaco">
+      <button class="help" aria-label="Qué hace Ábaco" aria-expanded="false" onclick="togglePop(event,this)">?</button>
+      <div class="pop" role="tooltip">Visualiza el valor posicional y domina las operaciones básicas de forma intuitiva.</div>
+      <div class="stage t-abaco">
+        <svg viewBox="0 0 170 140" aria-hidden="true">
+          <g>
+            <rect x="18" y="10" width="12" height="124" rx="3" fill="#3B44D0"/>
+            <rect x="140" y="10" width="12" height="124" rx="3" fill="#3B44D0"/>
+            <g fill="#FCE14B"><rect x="30" y="26" width="110" height="7" rx="3.5"/><rect x="30" y="54" width="110" height="7" rx="3.5"/><rect x="30" y="82" width="110" height="7" rx="3.5"/><rect x="30" y="110" width="110" height="7" rx="3.5"/></g>
+            <circle cx="46" cy="30" r="10" fill="#3D68B3"/><circle cx="67" cy="30" r="10" fill="#3D68B3"/><circle cx="46" cy="58" r="10" fill="#54C45E"/><circle cx="67" cy="58" r="10" fill="#54C45E"/><circle cx="88" cy="58" r="10" fill="#54C45E"/><circle cx="109" cy="58" r="10" fill="#54C45E"/><circle cx="46" cy="86" r="10" fill="#F8BBD0"/><circle cx="46" cy="114" r="10" fill="#ED7245"/><circle cx="67" cy="114" r="10" fill="#ED7245"/><circle cx="88" cy="114" r="10" fill="#ED7245"/>
+          </g>
+        </svg>
+      </div>
+      <div class="name"><h3>Ábaco</h3><svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+    </div>
+    <div class="card" role="button" tabindex="0" aria-label="Cubo Base 10" data-route="CuboBase10">
+      <button class="help" aria-label="Qué hace Cubo Base 10" aria-expanded="false" onclick="togglePop(event,this)">?</button>
+      <div class="pop" role="tooltip">Explora unidades, decenas y centenas para construir una base sólida en aritmética.</div>
+      <div class="stage t-cubo">
+        <svg viewBox="0 0 175 130" aria-hidden="true">
+          <g><rect x="14" y="20" width="90" height="90" rx="4" fill="#FFBA31" stroke="#C88A00" stroke-width="1.6"/><g stroke="#C88A00" stroke-opacity=".45" stroke-width=".8"><line x1="23" y1="20" x2="23" y2="110"/><line x1="14" y1="29" x2="104" y2="29"/><line x1="32" y1="20" x2="32" y2="110"/><line x1="14" y1="38" x2="104" y2="38"/><line x1="41" y1="20" x2="41" y2="110"/><line x1="14" y1="47" x2="104" y2="47"/><line x1="50" y1="20" x2="50" y2="110"/><line x1="14" y1="56" x2="104" y2="56"/><line x1="59" y1="20" x2="59" y2="110"/><line x1="14" y1="65" x2="104" y2="65"/><line x1="68" y1="20" x2="68" y2="110"/><line x1="14" y1="74" x2="104" y2="74"/><line x1="77" y1="20" x2="77" y2="110"/><line x1="14" y1="83" x2="104" y2="83"/><line x1="86" y1="20" x2="86" y2="110"/><line x1="14" y1="92" x2="104" y2="92"/><line x1="95" y1="20" x2="95" y2="110"/><line x1="14" y1="101" x2="104" y2="101"/></g><rect x="118" y="20" width="14" height="90" rx="3.5" fill="#FF8283" stroke="#C94F50" stroke-width="1.6"/><g stroke="#C94F50" stroke-opacity=".5" stroke-width=".8"><line x1="118" y1="29" x2="132" y2="29"/><line x1="118" y1="38" x2="132" y2="38"/><line x1="118" y1="47" x2="132" y2="47"/><line x1="118" y1="56" x2="132" y2="56"/><line x1="118" y1="65" x2="132" y2="65"/><line x1="118" y1="74" x2="132" y2="74"/><line x1="118" y1="83" x2="132" y2="83"/><line x1="118" y1="92" x2="132" y2="92"/><line x1="118" y1="101" x2="132" y2="101"/></g><rect x="146" y="96" width="14" height="14" rx="3" fill="#3B44D0" stroke="#2E36A8" stroke-width="1.6"/></g>
+        </svg>
+      </div>
+      <div class="name"><h3>Cubo Base 10</h3><svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+    </div>
+    <div class="card" role="button" tabindex="0" aria-label="Tangram" data-route="Tangram">
+      <button class="help" aria-label="Qué hace Tangram" aria-expanded="false" onclick="togglePop(event,this)">?</button>
+      <div class="pop" role="tooltip">Desarrolla el pensamiento espacial creando infinitas figuras con formas geométricas.</div>
+      <div class="stage t-tangram">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <g stroke="#fff" stroke-width="2.5" stroke-linejoin="round" transform="translate(10,10)">
+            <polygon points="0,0 100,0 50,50" fill="#3B44D0"/>
+            <polygon points="0,0 0,100 50,50" fill="#3B44D0"/>
+            <polygon points="100,50 100,100 50,100" fill="#FFBA31"/>
+            <polygon points="100,0 100,50 75,25" fill="#FF8283"/>
+            <polygon points="50,50 75,25 100,50 75,75" fill="#32C8BD"/>
+            <polygon points="25,75 50,50 75,75" fill="#FF8283"/>
+            <polygon points="0,100 25,75 75,75 50,100" fill="#512DA8"/>
+          </g>
+        </svg>
+      </div>
+      <div class="name"><h3>Tangram</h3><svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+    </div>
+    <div class="card" role="button" tabindex="0" aria-label="Fracciones magnéticas" data-route="Fracciones">
+      <button class="help" aria-label="Qué hace Fracciones magnéticas" aria-expanded="false" onclick="togglePop(event,this)">?</button>
+      <div class="pop" role="tooltip">Recurso visual para entender las partes de un todo y sus equivalencias.</div>
+      <div class="stage t-fracc">
+        <svg viewBox="0 0 160 140" aria-hidden="true">
+          <g>
+            <path d="M70 66 L70.0 114.0 A48 48 0 0 1 70.0 18.0 Z" fill="#FF8283" stroke="#C94F50" stroke-width="2.5" stroke-linejoin="round"/><text x="46" y="71" text-anchor="middle" font-family="Poppins,sans-serif" font-size="14" font-weight="600" fill="#fff">1/2</text>
+            <path d="M70 66 L70.0 18.0 A48 48 0 0 1 118.0 66.0 Z" fill="#32C8BD" stroke="#1A9990" stroke-width="2.5" stroke-linejoin="round"/><text x="92" y="49" text-anchor="middle" font-family="Poppins,sans-serif" font-size="13" font-weight="600" fill="#fff">1/4</text>
+            <path d="M84 80 L132.0 80.0 A48 48 0 0 1 84.0 128.0 Z" fill="#32C8BD" stroke="#1A9990" stroke-width="2.5" stroke-linejoin="round"/><text x="106" y="111" text-anchor="middle" font-family="Poppins,sans-serif" font-size="13" font-weight="600" fill="#fff">1/4</text>
+          </g>
+        </svg>
+      </div>
+      <div class="name"><h3>Fracciones magnéticas</h3><svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+    </div>
+    <div class="card" role="button" tabindex="0" aria-label="Fichas contadores" data-route="FichasContadores">
+      <button class="help" aria-label="Qué hace Fichas contadores" aria-expanded="false" onclick="togglePop(event,this)">?</button>
+      <div class="pop" role="tooltip">Ideales para el conteo temprano y la creación de patrones lógicos.</div>
+      <div class="stage t-fichas">
+        <svg viewBox="0 0 165 130" aria-hidden="true">
+          <g><circle cx="46" cy="36" r="21" fill="#3B44D0" stroke="#2E36A8" stroke-width="2.5"/><circle cx="94" cy="30" r="21" fill="#E5554F" stroke="#B03A34" stroke-width="2.5"/><circle cx="134" cy="58" r="21" fill="#FFBA31" stroke="#C88A00" stroke-width="2.5"/><rect x="24" y="78" width="42" height="11" rx="3" fill="#32C8BD" stroke="#1A9990" stroke-width="2"/><rect x="24" y="92" width="42" height="11" rx="3" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="2"/><rect x="24" y="106" width="42" height="11" rx="3" fill="#E5554F" stroke="#B03A34" stroke-width="2"/><rect x="92" y="96" width="42" height="11" rx="3" fill="#3B44D0" stroke="#2E36A8" stroke-width="2"/></g>
+        </svg>
+      </div>
+      <div class="name"><h3>Fichas contadores</h3><svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+    </div>
+    <div class="card" role="button" tabindex="0" aria-label="Banco" data-route="Banco">
+      <button class="help" aria-label="Qué hace Banco" aria-expanded="false" onclick="togglePop(event,this)">?</button>
+      <div class="pop" role="tooltip">Manipula monedas y billetes: sepáralos y júntalos en denominaciones equivalentes.</div>
+      <div class="stage t-banco">
+        <svg viewBox="0 0 185 125" aria-hidden="true">
+          <g transform="rotate(-3 85 55)">
+            <rect x="14" y="18" width="132" height="60" rx="7" fill="#FBE3DC" stroke="#E5736F" stroke-width="2.5"/>
+            <path d="M96 78 C108 52 130 58 146 40 L146 78 Z" fill="#F6B9AE" opacity=".5"/>
+            <rect x="14" y="18" width="20" height="60" fill="#E5736F"/>
+            <g fill="rgba(255,255,255,.85)"><circle cx="21" cy="26" r="1.5"/><circle cx="27" cy="26" r="1.5"/><circle cx="21" cy="32" r="1.5"/><circle cx="27" cy="32" r="1.5"/><circle cx="21" cy="64" r="1.5"/><circle cx="27" cy="64" r="1.5"/><circle cx="21" cy="70" r="1.5"/><circle cx="27" cy="70" r="1.5"/></g>
+            <text x="24" y="48" transform="rotate(-90 24 48)" text-anchor="middle" font-family="Poppins,sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">$20</text>
+            <text x="138" y="36" text-anchor="end" font-family="Poppins,sans-serif" font-size="15" font-weight="700" fill="#B03A34">$20</text>
+          </g>
+          <g>
+            <circle cx="138" cy="88" r="28" fill="#B8BDC7" stroke="#8A8F99" stroke-width="2.5"/>
+            <circle cx="138" cy="88" r="22.5" fill="none" stroke="#8A8F99" stroke-width="1.6" stroke-dasharray="1.5 5" opacity=".8"/>
+            <path d="M122 78 Q130 68 142 69" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" opacity=".45"/>
+            <text x="138" y="94" text-anchor="middle" font-family="Poppins,sans-serif" font-size="15" font-weight="700" fill="#4B5563">$10</text>
+          </g>
+        </svg>
+      </div>
+      <div class="name"><h3>Banco</h3><svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+    </div>
+    <div class="card" role="button" tabindex="0" aria-label="Geoplano" data-route="Geoplano">
+      <button class="help" aria-label="Qué hace Geoplano" aria-expanded="false" onclick="togglePop(event,this)">?</button>
+      <div class="pop" role="tooltip">Descubre perímetros, áreas y polígonos utilizando ligas de colores.</div>
+      <div class="stage t-geo">
+        <svg viewBox="0 0 145 130" aria-hidden="true">
+          <g>
+            <circle cx="22" cy="18" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="56" cy="18" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="90" cy="18" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="124" cy="18" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="22" cy="50" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="56" cy="50" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="90" cy="50" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="124" cy="50" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="22" cy="82" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="56" cy="82" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="90" cy="82" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="124" cy="82" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="22" cy="114" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="56" cy="114" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="90" cy="114" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="124" cy="114" r="5" fill="#E3E6EC" stroke="#B9BFCA" stroke-width="1"/><circle cx="22" cy="18" r="1.7" fill="#A7ADBB"/><circle cx="56" cy="18" r="1.7" fill="#A7ADBB"/><circle cx="90" cy="18" r="1.7" fill="#A7ADBB"/><circle cx="124" cy="18" r="1.7" fill="#A7ADBB"/><circle cx="22" cy="50" r="1.7" fill="#A7ADBB"/><circle cx="56" cy="50" r="1.7" fill="#A7ADBB"/><circle cx="90" cy="50" r="1.7" fill="#A7ADBB"/><circle cx="124" cy="50" r="1.7" fill="#A7ADBB"/><circle cx="22" cy="82" r="1.7" fill="#A7ADBB"/><circle cx="56" cy="82" r="1.7" fill="#A7ADBB"/><circle cx="90" cy="82" r="1.7" fill="#A7ADBB"/><circle cx="124" cy="82" r="1.7" fill="#A7ADBB"/><circle cx="22" cy="114" r="1.7" fill="#A7ADBB"/><circle cx="56" cy="114" r="1.7" fill="#A7ADBB"/><circle cx="90" cy="114" r="1.7" fill="#A7ADBB"/><circle cx="124" cy="114" r="1.7" fill="#A7ADBB"/>
+            <polygon points="22,18 124,50 56,114" fill="rgba(59,68,208,.10)" stroke="#3B44D0" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+            <polygon points="90,18 124,18 124,50" fill="rgba(255,186,49,.14)" stroke="#FFBA31" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+          </g>
+        </svg>
+      </div>
+      <div class="name"><h3>Geoplano</h3><svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+    </div>
+    </section>
+  </main>
+
+  <script src="assets/comun.js"></script>
+  <script>
+    /* Navegación de cards (el «?» y su popover no navegan) */
+    document.querySelectorAll('.card[data-route]').forEach((card) => {
+      const go = () => Luca.navegar(card.dataset.route);
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.help') || e.target.closest('.pop')) return;
+        go();
+      });
+      card.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    });
+
+    /* Popover «?»: tap abre/cierra; abrir uno cierra los demás; fuera o Escape cierra */
+    function togglePop(e, btn) {
+      e.stopPropagation();
+      const card = btn.closest('.card');
+      const wasOpen = card.classList.contains('pop-open');
+      closeAllPops();
+      if (!wasOpen) { card.classList.add('pop-open'); btn.setAttribute('aria-expanded', 'true'); }
+    }
+    function closeAllPops() {
+      document.querySelectorAll('.card.pop-open').forEach((c) => c.classList.remove('pop-open'));
+      document.querySelectorAll('.help[aria-expanded="true"]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+    }
+    document.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('.help') && !e.target.closest('.pop')) closeAllPops();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllPops(); });
+  </script>
+</body>
+</html>

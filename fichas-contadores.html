@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    #canvas { cursor: crosshair; }
+
+    /* ---- Ficha / Pila ---- */
+    .token { position: absolute; cursor: grab; touch-action: none; user-select: none; }
+    .token:active { cursor: grabbing; }
+    .token .body { position: relative; filter: drop-shadow(2px 3px 6px rgba(0,0,0,.12)); }
+    .token.selected .body { outline: 3px dashed rgba(59, 68, 208, .65); outline-offset: 3px; border-radius: 50%; }
+    .token.side.selected .body { border-radius: 6px; }
+
+    /* Vista desde arriba */
+    .disc { width: 56px; height: 56px; border-radius: 50%; border: 2px solid; display: flex; align-items: center; justify-content: center; }
+    .disc .val { font-size: 16px; font-weight: 700; line-height: 1; }
+    .stack-badge { position: absolute; top: -8px; right: -8px; background: var(--gray-900); color: #fff; font-size: 10px;
+      font-weight: 700; padding: 2px 7px; border-radius: 999px; z-index: 2; box-shadow: var(--shadow-card); }
+
+    /* Vista de lado (pictograma) */
+    .bars { display: flex; flex-direction: column-reverse; gap: 1px; width: 56px; }
+    .bar { height: 12px; border-radius: 3px; border: 1.5px solid; }
+    .side-val { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700;
+      color: var(--gray-700); background: rgba(255,255,255,.85); padding: 1px 7px; border-radius: 999px;
+      border: 1px solid var(--gray-200); white-space: nowrap; }
+
+    /* Retícula sutil, selección múltiple y guía de merge */
+    #canvas { background:
+      linear-gradient(rgba(59,68,208,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,68,208,.03) 1px, transparent 1px);
+      background-size: 20px 20px; }
+    .selection-rectangle { position: absolute; border: 2px solid var(--primary-600); background: var(--primary-50);
+      opacity: .6; display: none; z-index: 5; pointer-events: none; }
+    .snap-guide { position: absolute; pointer-events: none; z-index: 500; border: 2.5px dashed rgba(59,68,208,.4); display: none; }
+
+    /* Chip de perspectiva (informativo, fuera del área de captura) */
+    .view-chip { position: absolute; top: 14px; right: 14px; z-index: 50; background: rgba(255,255,255,.9);
+      border: 1px solid var(--gray-200); border-radius: 999px; padding: 5px 14px; font-size: 11px; font-weight: 600;
+      color: var(--gray-600); display: flex; align-items: center; gap: 6px; pointer-events: none; }
+    .view-chip .dotv { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-600); }
+
+    /* Popover de valor por color */
+    .val-pop { position: absolute; z-index: 1500; background: #fff; border: 1px solid var(--gray-100);
+      border-radius: var(--radius-sm); box-shadow: var(--shadow-float); padding: 10px; display: flex; gap: 8px; align-items: center; }
+    .val-pop .chip-token { width: 18px; height: 18px; border-radius: 50%; border: 2px solid; flex-shrink: 0; }
+    .val-pop label { font-size: 11px; font-weight: 600; color: var(--gray-500); white-space: nowrap; }
+    .val-pop input { width: 64px; padding: 7px 8px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      font-size: 14px; font-weight: 600; color: var(--gray-900); text-align: center; outline: none; }
+    .val-pop input:focus { border-color: var(--primary-600); }
+    .val-pop button { border: none; background: var(--primary-600); color: #fff; font-size: 12px; font-weight: 600;
+      padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; }
+    .val-pop button:hover { background: var(--primary-700); }
+
+    /* Filas de color y badge de valor en el desplegable ⋯ */
+    .fc-row { display: flex; align-items: center; gap: 4px; }
+    .fc-row .tc-item { flex: 1; }
+    .chip-token { width: 20px; height: 20px; border-radius: 50%; border: 2px solid; flex-shrink: 0; margin: 1px; }
+    .fc-val-btn { min-width: 34px; padding: 5px 8px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      background: var(--gray-50); font-size: 12px; font-weight: 700; color: var(--primary-600); cursor: pointer; flex-shrink: 0; }
+    .fc-val-btn:hover { border-color: var(--primary-600); background: var(--primary-50); }
+    .tc-div { height: 1px; background: var(--gray-100); margin: 8px 4px; }
+
+    #canvasHint { position: absolute; top: 45%; left: 50%; transform: translate(-50%,-50%);
+      text-align: center; color: var(--gray-400); pointer-events: none; transition: opacity 0.4s; }
+    #canvasHint .lucide { width: 48px; height: 48px; margin-bottom: 10px; }
+    #canvasHint p { font-size: 14px; font-weight: 500; }
+  </style>
+</head>
+<body>
+<div class="brand-chip"><span class="word">Luca</span><span class="dot">.</span></div>
+
+<div class="app">
+  <div class="workspace">
+    <div id="canvas">
+      <div id="canvasHint">
+        <i data-lucide="circle-dot"></i>
+        <p>Abre el menú L. → ⋯ y elige un color<br>para agregar una ficha al lienzo</p>
+      </div>
+      <div class="snap-guide" id="snapGuide"></div>
+    </div>
+    <div class="selection-rectangle" id="selectionRect"></div>
+    <div class="view-chip"><span class="dotv"></span><span id="viewChipTxt">Desde arriba</span></div>
+
+    <div class="total-bar" id="totalBar">
+      <div>
+        <span class="label">Representación simbólica</span>
+        <span class="number" id="totalNumber">0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="assets/comun.js"></script>
+<script>
+  const app = {
+    canvas: null, totalBar: null, totalNumber: null, selectionRect: null, snapGuide: null, canvasHint: null,
+
+    SNAP: 20, D: 56, BAR_H: 12, BAR_GAP: 1,
+    view: 'top', showVista: true,
+    pieces: [], selected: [], zIdx: 10, pop: null,
+    isDragging: false, isSelecting: false, _suppressClick: false,
+    dragStart: null, startX: 0, startY: 0,
+
+    /* El valor es propiedad del COLOR: todas las fichas de un color comparten el mismo valor (0–100, default 1) */
+    COLORS: {
+      indigo:   { h: '#3B44D0', d: '#2E36A8', txt: '#FFFFFF', label: 'Ficha indigo' },
+      roja:     { h: '#E5554F', d: '#B03A34', txt: '#FFFFFF', label: 'Ficha roja' },
+      amarilla: { h: '#FFBA31', d: '#C88A00', txt: '#FFFFFF', label: 'Ficha amarilla' },
+      verde:    { h: '#32C8BD', d: '#1A9990', txt: '#FFFFFF', label: 'Ficha verde' },
+      blanca:   { h: '#FFFFFF', d: '#9CA3AF', txt: '#111827', label: 'Ficha blanca' }
+    },
+    colorValues: { indigo: 1, roja: 1, amarilla: 1, verde: 1, blanca: 1 },
+
+    snap(v) { return Math.round(v / this.SNAP) * this.SNAP; },
+    pieceValue(p) { return p.fichas.reduce((s, f) => s + this.colorValues[f.color], 0); },
+
+    /* ================= Piezas ================= */
+    addFicha(color) {
+      if (this.canvasHint) this.canvasHint.style.opacity = '0';
+      const off = (this.pieces.length % 5) * this.SNAP;
+      const p = {
+        fichas: [{ color }],
+        x: this.snap((this.canvas.offsetWidth || 800) / 2 - this.D / 2) + off,
+        y: this.snap((this.canvas.offsetHeight || 600) / 2 - this.D / 2) + off
+      };
+      p.el = document.createElement('div');
+      p.el.className = 'token';
+      p.el.style.zIndex = this.zIdx++;
+      p.el.addEventListener('pointerdown', (e) => this.onPieceDown(e, p));
+      this.canvas.appendChild(p.el);
+      this.pieces.push(p);
+      this.render(p);
+      this.updateTotal();
+      Luca.fab.refreshCard();
+    },
+
+    render(p) {
+      const isStack = p.fichas.length > 1, val = this.pieceValue(p);
+      p.el.classList.toggle('side', this.view === 'side');
+      p.el.innerHTML = '';
+
+      const menu = Luca.ctxRadial(isStack ? [
+        { action: 'unstack', icon: 'layers',           tip: 'Desapilar' },
+        { action: 'front',   icon: 'arrow-up-to-line', tip: 'Traer al frente' },
+        { action: 'delete',  icon: 'x',                tip: 'Eliminar', danger: true }
+      ] : [
+        { action: 'front',   icon: 'arrow-up-to-line', tip: 'Traer al frente' },
+        { action: 'delete',  icon: 'x',                tip: 'Eliminar', danger: true }
+      ]);
+      menu.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn || btn.dataset.lp) return;
+        this.selectOnly(p);
+        this.runCtx(btn.dataset.action);
+      });
+
+      const body = document.createElement('div');
+      body.className = 'body';
+      if (this.view === 'top') {
+        const top = p.fichas[p.fichas.length - 1], c = this.COLORS[top.color];
+        const shadow = isStack ? `box-shadow:3px 3px 0 ${this.hexA(c.d, .45)},6px 6px 0 ${this.hexA(c.d, .22)};` : '';
+        body.innerHTML = `<div class="disc" style="background:${c.h};border-color:${c.d};${shadow}">
+            ${this.showVista ? `<span class="val" style="color:${c.txt}">${val}</span>` : ''}
+          </div>${isStack ? `<span class="stack-badge">×${p.fichas.length}</span>` : ''}`;
+      } else {
+        const bars = p.fichas.map(f => {
+          const c = this.COLORS[f.color];
+          return `<div class="bar" style="background:${c.h};border-color:${c.d}"></div>`;
+        }).join('');
+        body.innerHTML = `${this.showVista ? `<span class="side-val">${val}</span>` : ''}<div class="bars">${bars}</div>`;
+      }
+
+      p.el.appendChild(menu);
+      p.el.appendChild(body);
+      this.positionPiece(p);
+      p.el.classList.toggle('selected', this.selected.includes(p));
+      Luca.icons();
+    },
+
+    positionPiece(p) {
+      if (this.view === 'top') {
+        p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px';
+      } else {
+        const h = p.fichas.length * this.BAR_H + (p.fichas.length - 1) * this.BAR_GAP;
+        p.el.style.left = p.x + 'px';
+        p.el.style.top = (p.y + this.D - h) + 'px';   /* base anclada: la torre crece hacia arriba */
+      }
+    },
+
+    renderAll() { this.pieces.forEach(p => this.render(p)); },
+    hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; },
+
+    removePiece(p) {
+      p.el.remove();
+      this.pieces = this.pieces.filter(x => x !== p);
+      this.selected = this.selected.filter(x => x !== p);
+      if (this.pieces.length === 0 && this.canvasHint) this.canvasHint.style.opacity = '1';
+    },
+
+    /* ================= Selección ================= */
+    select(list) {
+      this.selected = list;
+      this.pieces.forEach(p => p.el.classList.toggle('selected', list.includes(p)));
+      Luca.fab.refreshCard();
+    },
+    selectOnly(p) { if (!(this.selected.length === 1 && this.selected[0] === p)) this.select([p]); },
+
+    onPieceDown(e, p) {
+      if (e.target.closest('.ctx-radial')) return;
+      Luca.text.deselect();
+      this.closePop();
+      if (!this.selected.includes(p)) this.select([p]);
+      p.el.style.zIndex = this.zIdx++;
+      const cr = this.canvas.getBoundingClientRect();
+      this.isDragging = true;
+      this.dragStart = {
+        x: e.clientX - cr.left, y: e.clientY - cr.top,
+        orig: this.selected.map(s => ({ p: s, x: s.x, y: s.y })),
+        moved: false, main: p
+      };
+      e.preventDefault();
+    },
+
+    /* ================= Apilar / desapilar / merge ================= */
+    runCtx(a) {
+      const sel = this.selected;
+      if (!sel.length) return;
+      if (a === 'delete') { sel.slice().forEach(p => this.removePiece(p)); this.select([]); this.updateTotal(); }
+      if (a === 'front') sel.forEach(p => p.el.style.zIndex = this.zIdx++);
+      if (a === 'stack' && sel.length > 1) {
+        const base = sel[0];
+        sel.slice(1).forEach(p => { base.fichas = base.fichas.concat(p.fichas); this.removePiece(p); });
+        this.select([base]); this.render(base); this.updateTotal();
+      }
+      if (a === 'unstack') {
+        const p = sel[0];
+        if (!p || p.fichas.length < 2) return;
+        const fichas = p.fichas, bx = p.x, by = p.y;
+        const cols = Math.max(3, Math.ceil(Math.sqrt(fichas.length)));
+        this.removePiece(p);
+        const created = fichas.map((f, i) => {
+          const np = { fichas: [f], x: this.snap(bx + (i % cols) * 80), y: this.snap(by + Math.floor(i / cols) * 80) };
+          np.el = document.createElement('div');
+          np.el.className = 'token';
+          np.el.style.zIndex = this.zIdx++;
+          np.el.addEventListener('pointerdown', (e) => this.onPieceDown(e, np));
+          this.canvas.appendChild(np.el);
+          this.pieces.push(np);
+          return np;
+        });
+        this.select(created); this.renderAll(); this.updateTotal();
+      }
+      Luca.fab.refreshCard();
+    },
+
+    findMergeTarget(p) {
+      return this.pieces.find(o => o !== p &&
+        Math.hypot((o.x + this.D / 2) - (p.x + this.D / 2), (o.y + this.D / 2) - (p.y + this.D / 2)) < this.D * 0.8);
+    },
+
+    tryMerge(p) {
+      const target = this.findMergeTarget(p);
+      if (!target) return;
+      target.fichas = target.fichas.concat(p.fichas);
+      this.removePiece(p);
+      this.select([target]);
+      this.render(target);
+      this.updateTotal();
+    },
+
+    /* ================= Valor por color ================= */
+    setColorValue(colorKey, v) {
+      this.colorValues[colorKey] = Math.max(0, Math.min(100, Math.round(v)));
+      this.renderAll();
+      this.updateTotal();
+      document.querySelectorAll(`[data-val="${colorKey}"]`).forEach(b => b.textContent = this.colorValues[colorKey]);
+      Luca.fab.refreshCard();
+    },
+
+    openValuePop(colorKey) {
+      this.closePop();
+      const c = this.COLORS[colorKey];
+      const pop = document.createElement('div');
+      pop.className = 'val-pop';
+      pop.innerHTML = `<span class="chip-token" style="background:${c.h};border-color:${c.d}"></span>
+        <label>Valor del color</label>
+        <input type="number" inputmode="numeric" min="0" max="100" value="${this.colorValues[colorKey]}">
+        <button>OK</button>`;
+      const cr = this.canvas.getBoundingClientRect();
+      const anchor = document.querySelector('.tool-card');
+      let left = cr.width / 2 - 110, top = cr.height / 2 - 30;
+      if (anchor) {
+        const ar = anchor.getBoundingClientRect();
+        left = ar.left - cr.left - 236; top = ar.top - cr.top + 8;
+      }
+      pop.style.left = Math.max(8, Math.min(left, cr.width - 230)) + 'px';
+      pop.style.top = Math.max(8, Math.min(top, cr.height - 70)) + 'px';
+      const input = pop.querySelector('input');
+      const commit = () => {
+        const v = input.value.trim();
+        this.closePop();
+        if (v !== '' && !isNaN(v)) this.setColorValue(colorKey, +v);
+      };
+      pop.querySelector('button').addEventListener('click', commit);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') this.closePop(); });
+      pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+      this.canvas.appendChild(pop);
+      this.pop = pop;
+      input.focus(); input.select();
+    },
+    closePop() { if (this.pop) { this.pop.remove(); this.pop = null; } },
+
+    /* ================= Perspectiva global ================= */
+    setView(v) {
+      this.view = v;
+      const chip = document.getElementById('viewChipTxt');
+      if (chip) chip.textContent = v === 'top' ? 'Desde arriba' : 'De lado';
+      this.renderAll();
+      Luca.fab.refreshCard();
+    },
+
+    /* ================= Universales ================= */
+    toggleVista() {
+      this.showVista = !this.showVista;
+      this.totalBar.classList.toggle('hidden', !this.showVista);
+      this.renderAll();
+    },
+
+    clearCanvas() {
+      this.pieces.slice().forEach(p => this.removePiece(p));
+      this.select([]);
+      Object.keys(this.colorValues).forEach(k => this.colorValues[k] = 1);
+      this.setView('top');
+      Luca.text.clear();
+      this.closePop();
+      if (this.canvasHint) this.canvasHint.style.opacity = '1';
+      this.updateTotal();
+      Luca.fab.refreshCard();
+    },
+
+    updateTotal() {
+      this.totalNumber.textContent = this.pieces.reduce((s, p) => s + this.pieceValue(p), 0);
+    },
+
+    /* ================= Init ================= */
+    init() {
+      this.canvas = document.getElementById('canvas');
+      this.totalBar = document.getElementById('totalBar');
+      this.totalNumber = document.getElementById('totalNumber');
+      this.selectionRect = document.getElementById('selectionRect');
+      this.snapGuide = document.getElementById('snapGuide');
+      this.canvasHint = document.getElementById('canvasHint');
+
+      Luca.text.init(this.canvas, {
+        onSelectionChange: () => { this.selected.forEach(p => p.el.classList.remove('selected')); this.selected = []; }
+      });
+
+      Luca.fab.init({
+        vista: () => this.toggleVista(),
+        vistaTip: 'Ver / ocultar valores y total',
+        capture: () => Luca.capturar(this.canvas, 'fichas-contadores-luca'),
+        reset: () => this.clearCanvas(),
+        resetTip: 'Reiniciar lienzo',
+        isPiece: (t) => !!t.closest('.token'),
+        /* Particular: 5 colores (1 clic = 1 ficha) con badge de valor editable + Cambiar perspectiva */
+        buildPart: (el) => {
+          Object.entries(this.COLORS).forEach(([key, c]) => {
+            const row = document.createElement('div');
+            row.className = 'fc-row';
+            const b = document.createElement('button');
+            b.className = 'tc-item';
+            b.innerHTML = `<span class="chip-token" style="background:${c.h};border-color:${c.d}"></span>${c.label}`;
+            b.addEventListener('click', () => this.addFicha(key));
+            const v = document.createElement('button');
+            v.className = 'fc-val-btn';
+            v.dataset.val = key;
+            v.title = 'Editar valor del color';
+            v.textContent = this.colorValues[key];
+            v.addEventListener('click', (e) => { e.stopPropagation(); this.openValuePop(key); });
+            row.appendChild(b); row.appendChild(v);
+            el.appendChild(row);
+          });
+          const div = document.createElement('div'); div.className = 'tc-div'; el.appendChild(div);
+          const pb = document.createElement('button');
+          pb.className = 'tc-item';
+          pb.innerHTML = `<span class="chip-ic ic-indigo"><i data-lucide="${this.view === 'top' ? 'bar-chart-3' : 'circle'}"></i></span>Cambiar perspectiva<span class="tc-val">${this.view === 'top' ? 'De lado' : 'Desde arriba'}</span>`;
+          pb.addEventListener('click', () => this.setView(this.view === 'top' ? 'side' : 'top'));
+          el.appendChild(pb);
+        },
+        /* Contextual: ficha / pila / selección múltiple */
+        getCtx: () => {
+          const n = this.selected.length;
+          if (!n) return null;
+          if (n > 1) return {
+            title: n + ' piezas seleccionadas',
+            items: [
+              { icon: 'layers', tip: 'Apilar',   action: 'stack' },
+              { icon: 'x',      tip: 'Eliminar', action: 'delete', danger: true },
+            ],
+            run: (a) => this.runCtx(a)
+          };
+          const p = this.selected[0], isStack = p.fichas.length > 1;
+          return {
+            title: isStack ? 'Pila seleccionada (' + p.fichas.length + ' fichas)' : 'Ficha seleccionada',
+            items: isStack ? [
+              { icon: 'layers',           tip: 'Desapilar',       action: 'unstack' },
+              { icon: 'arrow-up-to-line', tip: 'Traer al frente', action: 'front' },
+              { icon: 'x',                tip: 'Eliminar',        action: 'delete', danger: true },
+            ] : [
+              { icon: 'arrow-up-to-line', tip: 'Traer al frente', action: 'front' },
+              { icon: 'x',                tip: 'Eliminar',        action: 'delete', danger: true },
+            ],
+            run: (a) => this.runCtx(a)
+          };
+        }
+      });
+
+      /* Selección múltiple por rectángulo (coordenadas de canvas) */
+      this.canvas.addEventListener('pointerdown', (e) => {
+        if (e.target === this.canvas) {
+          Luca.text.deselect();
+          this.closePop();
+          const cr = this.canvas.getBoundingClientRect();
+          this.isSelecting = true;
+          this.startX = e.clientX - cr.left; this.startY = e.clientY - cr.top;
+          this.select([]);
+        }
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        const cr = this.canvas.getBoundingClientRect();
+        const cx = e.clientX - cr.left, cy = e.clientY - cr.top;
+
+        if (this.isDragging && this.dragStart) {
+          const dx = this.snap(cx - this.dragStart.x), dy = this.snap(cy - this.dragStart.y);
+          if (dx || dy) this.dragStart.moved = true;
+          this.dragStart.orig.forEach(o => { o.p.x = o.x + dx; o.p.y = o.y + dy; this.positionPiece(o.p); });
+
+          /* Guía de merge: solo con una pieza en movimiento */
+          if (this.dragStart.orig.length === 1) {
+            const target = this.findMergeTarget(this.dragStart.main);
+            if (target) {
+              const t = target.el;
+              this.snapGuide.style.cssText = `display:block;left:${t.offsetLeft - 4}px;top:${t.offsetTop - 4}px;
+                width:${t.offsetWidth + 8}px;height:${t.offsetHeight + 8}px;
+                border-radius:${this.view === 'top' ? '50%' : '8px'};`;
+            } else this.snapGuide.style.display = 'none';
+          }
+        }
+
+        if (this.isSelecting) {
+          const left = Math.min(this.startX, cx), top = Math.min(this.startY, cy);
+          const width = Math.abs(cx - this.startX), height = Math.abs(cy - this.startY);
+          Object.assign(this.selectionRect.style, { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px', display: 'block' });
+          const hit = this.pieces.filter(p => {
+            const l = p.el.offsetLeft, t = p.el.offsetTop, r = l + p.el.offsetWidth, b = t + p.el.offsetHeight;
+            return !(r < left || l > left + width || b < top || t > top + height);
+          });
+          this.pieces.forEach(p => p.el.classList.toggle('selected', hit.includes(p)));
+          this.selected = hit;
+        }
+      });
+
+      window.addEventListener('pointerup', () => {
+        if (this.isSelecting) {
+          this._suppressClick = this.selected.length > 0;
+          this.isSelecting = false;
+          this.selectionRect.style.display = 'none';
+          Luca.fab.refreshCard();
+        }
+        if (this.isDragging) {
+          this.isDragging = false;
+          this.snapGuide.style.display = 'none';
+          if (this.dragStart && this.dragStart.moved && this.dragStart.orig.length === 1) this.tryMerge(this.dragStart.main);
+          this.dragStart = null;
+        }
+      });
+
+      this.canvas.addEventListener('click', (e) => {
+        if (this._suppressClick) { this._suppressClick = false; return; }
+        if (e.target === this.canvas) this.select([]);
+      });
+    }
+  };
+
+  window.addEventListener('DOMContentLoaded', () => app.init());
+</script>
+  <script>
+    /* User Guide (coach marks) — se abre desde el nodo «?» del radial */
+    window.addEventListener('DOMContentLoaded', function () {
+      Luca.guide.init('fichas-contadores', [
+        { el: '#canvas', title: 'El lienzo', text: 'Arrastra las fichas: se alinean a la cuadrícula y puedes apilarlas soltando una sobre otra.' },
+        { el: '.fab2 [data-id=\'tool\']', title: 'Agregar fichas', text: 'Desde «⋯ Acciones» agrega fichas de los 5 colores, edita su valor y cambia entre vista superior y lateral.', before: () => Luca.fab.setOpen(true) },
+      ].concat(Luca.guide.commonSteps()));
+    });
+  </script>
+</body>
+</html>
